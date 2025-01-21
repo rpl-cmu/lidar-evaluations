@@ -1,0 +1,11 @@
+[project]
+name = "lidar-features"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["scikit-build-core", "pybind11", "pybind11-stubgen", "numpy"]
+build-backend = "scikit_build_core.build"
