@@ -5,11 +5,9 @@
 #pragma once
 #include "features.h"
 
-namespace loam {
-
 /*********************************************************************************************************************/
-template <template <typename> class Accessor = FieldAccessor,
-          typename PointType, template <typename> class Alloc>
+template <template <typename> class Accessor, typename PointType,
+          template <typename> class Alloc>
 LoamFeatures<PointType, Alloc>
 extractFeatures(const std::vector<PointType, Alloc<PointType>> &input_scan,
                 const LidarParams &lidar_params,
@@ -19,7 +17,7 @@ extractFeatures(const std::vector<PointType, Alloc<PointType>> &input_scan,
   LoamFeatures<PointType, Alloc> out_features;
   // Compute the number of points in each sector given the parameters
   const size_t points_per_sector =
-      lidar_params.points_per_line / params.number_sectors;
+      lidar_params.num_columns / params.number_sectors;
 
   // Step 1: Compute Curvature for all points this is used in the extraction of
   // both planar and edge feature points
@@ -31,20 +29,20 @@ extractFeatures(const std::vector<PointType, Alloc<PointType>> &input_scan,
       computeValidPoints<Accessor>(input_scan, lidar_params, params);
 
   /// Step 3: Detect features in each sector of each scan line
-  for (size_t scan_line_idx = 0; scan_line_idx < lidar_params.scan_lines;
+  for (size_t scan_line_idx = 0; scan_line_idx < lidar_params.num_rows;
        scan_line_idx++) {
     // Independently detect features in each sector of this scan_line
     for (size_t sector_idx = 0; sector_idx < params.number_sectors;
          sector_idx++) {
       // Get the point index of the sector start and sector end
       const size_t sector_start_pt =
-          (scan_line_idx * lidar_params.points_per_line) +
+          (scan_line_idx * lidar_params.num_columns) +
           (sector_idx * points_per_sector);
       // Special case for end point as we add any reminder points to the last
       // sector
       const size_t sector_end_pt =
           (sector_idx == params.number_sectors - 1)
-              ? ((scan_line_idx + 1) * lidar_params.points_per_line)
+              ? ((scan_line_idx + 1) * lidar_params.num_columns)
               : sector_start_pt + points_per_sector;
 
       // Sort the points within the sector based on curvature
@@ -68,8 +66,8 @@ extractFeatures(const std::vector<PointType, Alloc<PointType>> &input_scan,
 }
 
 /*********************************************************************************************************************/
-template <template <typename> class Accessor = FieldAccessor,
-          typename PointType, template <typename> class Alloc>
+template <template <typename> class Accessor, typename PointType,
+          template <typename> class Alloc>
 std::vector<PointCurvature>
 computeCurvature(const std::vector<PointType, Alloc<PointType>> &input_scan,
                  const LidarParams &lidar_params,
@@ -81,16 +79,15 @@ computeCurvature(const std::vector<PointType, Alloc<PointType>> &input_scan,
 
   // Structured search (search over each scan line individually over all points
   // [except points on scan line ends]
-  for (size_t scan_line_idx = 0; scan_line_idx < lidar_params.scan_lines;
+  for (size_t scan_line_idx = 0; scan_line_idx < lidar_params.num_rows;
        scan_line_idx++) {
-    for (size_t line_pt_idx = 0; line_pt_idx < lidar_params.points_per_line;
+    for (size_t line_pt_idx = 0; line_pt_idx < lidar_params.num_columns;
          line_pt_idx++) {
       const size_t idx =
-          (scan_line_idx * lidar_params.points_per_line) + line_pt_idx;
+          (scan_line_idx * lidar_params.num_columns) + line_pt_idx;
       // If point is on the edge of the scan line record invalid curvature [-1]
       if (line_pt_idx < params.neighbor_points ||
-          line_pt_idx >=
-              lidar_params.points_per_line - params.neighbor_points) {
+          line_pt_idx >= lidar_params.num_columns - params.neighbor_points) {
         curvature.push_back(PointCurvature(idx, -1));
       }
       // If not an edge point compute the curvature
@@ -116,59 +113,6 @@ computeCurvature(const std::vector<PointType, Alloc<PointType>> &input_scan,
     }
   }
   return curvature;
-}
-
-/*********************************************************************************************************************/
-template <template <typename> class Accessor = FieldAccessor,
-          typename PointType, template <typename> class Alloc>
-std::vector<bool>
-computeValidPoints(const std::vector<PointType, Alloc<PointType>> &input_scan,
-                   const LidarParams &lidar_params,
-                   const FeatureExtractionParams &params) {
-  validateLidarScan(input_scan, lidar_params);
-  // Allocate mask (with valid flags)
-  std::vector<bool> mask(input_scan.size(), true);
-
-  // Structured search (search over each scan line individually over all points
-  // [except points on scan line ends]
-  for (size_t scan_line_idx = 0; scan_line_idx < lidar_params.scan_lines;
-       scan_line_idx++) {
-    for (size_t line_pt_idx = 0; line_pt_idx < lidar_params.points_per_line;
-         line_pt_idx++) {
-      const size_t idx =
-          (scan_line_idx * lidar_params.points_per_line) + line_pt_idx;
-
-      // CHECK 1: Due to edge effects, the first and last neighbor_points points
-      // of each scan line are invalid
-      if (features_internal::markEdgesInvalid(idx, line_pt_idx, lidar_params,
-                                              params, mask))
-        continue;
-
-      // Get the current point and its two neighbors
-      const PointType prev_point = input_scan.at(idx - 1);
-      const PointType point = input_scan.at(idx);
-      const PointType next_point = input_scan[idx + 1];
-
-      // Compute the range of each point
-      const double point_range = pointRange<Accessor>(point);
-      const double next_point_range = pointRange<Accessor>(next_point);
-      const double prev_point_range = pointRange<Accessor>(prev_point);
-
-      // CHECK 2: Is the point in the valid range of the LiDAR
-      if (features_internal::markOutOfRangeInvalid(idx, point_range,
-                                                   lidar_params, params, mask))
-        continue;
-      // CHECK 3: Occlusions
-      if (features_internal::markOccludedInvalid(
-              idx, point_range, next_point_range, params, mask))
-        continue;
-      // CHECK 4: Check if the point is on a plane nearly parallel to the LiDAR
-      // Beam (no continue b/c last )
-      features_internal::markParallelInvalid(idx, prev_point_range, point_range,
-                                             next_point_range, params, mask);
-    } // end line point search
-  } // end scan line search
-  return mask;
 }
 
 /**
@@ -243,5 +187,3 @@ void extractSectorPlanarFeatures(
 }
 
 } // namespace features_internal
-
-} // namespace loam
