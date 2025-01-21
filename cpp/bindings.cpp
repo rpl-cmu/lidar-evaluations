@@ -3,8 +3,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "conversions.h"
-#include "types_bindings.h"
+#include "helpers.h"
+#include "types.h"
 
 PYBIND11_MODULE(_cpp, m) {
   auto m_types = m.def_submodule(

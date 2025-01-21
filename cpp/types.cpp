@@ -8,7 +8,7 @@
 namespace py = pybind11;
 using namespace pybind11::literals;
 
-inline void makeTypes(py::module &m) {
+void makeTypes(py::module &m) {
   py::class_<Stamp>(m, "Stamp")
       .def(py::init<uint32_t, uint32_t>(), py::kw_only(), "sec"_a, "nsec"_a)
       .def_static("from_sec", &Stamp::from_sec)
@@ -60,32 +60,6 @@ inline void makeTypes(py::module &m) {
       .def_readonly("max_range", &LidarParams::max_range)
       .def_readonly("rate", &LidarParams::rate)
       .def("__repr__", &LidarParams::toString);
-
-  // Imu
-  py::class_<ImuMeasurement>(m, "ImuMeasurement")
-      .def(py::init<Stamp, Eigen::Vector3d, Eigen::Vector3d>(), "stamp"_a,
-           "gyro"_a, "accel"_a)
-      .def_readonly("stamp", &ImuMeasurement::stamp)
-      .def_readonly("gyro", &ImuMeasurement::gyro)
-      .def_readonly("accel", &ImuMeasurement::accel)
-      .def("__repr__", &ImuMeasurement::toString);
-
-  py::class_<ImuParams>(m, "ImuParams")
-      .def(py::init<double, double, double, double, double, double,
-                    Eigen::Vector3d>(),
-           py::kw_only(), "gyro"_a = 1e-5, "accel"_a = 1e-5,
-           "gyro_bias"_a = 1e-6, "accel_bias"_a = 1e-6, "bias_init"_a = 1e-7,
-           "integration"_a = 1e-7, "gravity"_a = Eigen::Vector3d(0, 0, 9.81))
-      .def_static("up", &ImuParams::up)
-      .def_static("down", &ImuParams::down)
-      .def_readwrite("gyro", &ImuParams::gyro)
-      .def_readwrite("accel", &ImuParams::accel)
-      .def_readwrite("gyro_bias", &ImuParams::gyro_bias)
-      .def_readwrite("accel_bias", &ImuParams::accel_bias)
-      .def_readwrite("bias_init", &ImuParams::bias_init)
-      .def_readwrite("integration", &ImuParams::integration)
-      .def_readwrite("gravity", &ImuParams::gravity)
-      .def("__repr__", &ImuParams::toString);
 
   py::class_<SO3>(m, "SO3")
       .def(py::init<double, double, double, double>(), py::kw_only(), "qx"_a,

@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-#include "common.h"
+#include "../types.h"
 
 namespace loam {
 

@@ -4,6 +4,14 @@
 #include <Eigen/Geometry>
 #include <iostream>
 
+#include <pybind11/eigen.h>
+#include <pybind11/operators.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+namespace py = pybind11;
+using namespace pybind11::literals;
+
 struct Stamp {
   uint32_t sec;
   uint32_t nsec;
@@ -183,3 +191,5 @@ struct SE3 {
     return oss.str();
   }
 };
+
+void makeTypes(py::module &m);
