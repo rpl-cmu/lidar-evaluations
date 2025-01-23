@@ -12,3 +12,8 @@ loam = { workspace = true }
 
 [tool.uv.workspace]
 members = ["evalio", "loam"]
+
+[dependency-groups]
+dev = [
+    "pybind11-stubgen>=2.5.1",
+]

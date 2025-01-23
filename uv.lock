@@ -292,12 +292,20 @@ dependencies = [
     { name = "tqdm" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pybind11-stubgen" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "evalio", editable = "evalio" },
     { name = "loam", editable = "loam" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pybind11-stubgen", specifier = ">=2.5.1" }]
 
 [[package]]
 name = "loam"
