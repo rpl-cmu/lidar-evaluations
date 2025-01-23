@@ -11,3 +11,4 @@ wheels/
 
 # cpp files
 .cache
+compile_commands.json

@@ -15,5 +15,6 @@ members = ["evalio", "loam"]
 
 [dependency-groups]
 dev = [
+    "compdb>=0.2.0",
     "pybind11-stubgen>=2.5.1",
 ]

@@ -294,6 +294,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "compdb" },
     { name = "pybind11-stubgen" },
 ]
 
@@ -305,7 +306,10 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pybind11-stubgen", specifier = ">=2.5.1" }]
+dev = [
+    { name = "compdb", specifier = ">=0.2.0" },
+    { name = "pybind11-stubgen", specifier = ">=2.5.1" },
+]
 
 [[package]]
 name = "loam"
