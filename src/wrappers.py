@@ -109,10 +109,11 @@ class Rerun:
                 self.history[name][1].append(value.trans)
 
             rr.log(
-                f"{name}/history",
+                f"{name}_history",
                 rr.Points3D(
                     np.asarray(self.history[name][1]), colors=self.history[name][0]
                 ),
+                static=True,
             )
 
         elif isinstance(value, LidarMeasurement):

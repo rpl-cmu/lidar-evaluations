@@ -8,6 +8,8 @@ from wrappers import GroundTruthIterator, Rerun, Writer
 import params
 import numpy as np
 
+visualize = False
+
 # Params
 experiment_params = params.ExperimentParams(
     dataset="newer_college_2020/01_short_experiment",
@@ -25,7 +27,9 @@ gt = GroundTruthIterator(gt)
 
 # Create writer
 writer = Writer(experiment_params.output)
-rr = Rerun(to_hide=["pose/points"])
+rr = None
+if visualize:
+    rr = Rerun(to_hide=["pose/points", "pose/features/*"])
 
 # params
 lp = convert(dataset.lidar_params())
@@ -38,8 +42,10 @@ prev_gt = None
 iter_gt = SE3.identity()
 iter_est = SE3.identity()
 
-pbar = tqdm(iter(dataset))
-for mm in pbar:
+data_iter = iter(dataset)
+pbar = tqdm(total=len(data_iter))  # type: ignore
+
+for mm in data_iter:
     if not isinstance(mm, LidarMeasurement):
         continue
 
@@ -61,30 +67,35 @@ for mm in pbar:
         continue
 
     # Get initialization
+    init_gt = prev_gt.inverse() * curr_gt
     match experiment_params.init:
         case params.Initialization.GroundTruth:
-            init = prev_gt.inverse() * curr_gt
-            init = convert(init)
+            init = convert(init_gt)
         case _:
             raise ValueError("Unknown initialization")
 
     pose = loam.registerFeatures(curr_feat, prev_feat, init, params=rp)
     pose = convert(pose)
 
-    iter_gt = iter_gt * curr_gt
+    iter_gt = iter_gt * init_gt
     iter_est = iter_est * pose
-    rr.stamp(mm.stamp)
-    rr.log("gt", iter_gt)
-    rr.log("pose", iter_est)
-    rr.log("pose/points", mm)
-    rr.log("pose/features", curr_feat)
+    if rr is not None:
+        rr.stamp(mm.stamp)
+        rr.log("gt", iter_gt)
+        rr.log("pose", iter_est)
+        rr.log("pose/points", mm)
+        rr.log("pose/features", curr_feat)
 
     pbar.set_description(
         f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}"
     )
+    pbar.update()
 
     # Save results
     # TODO: Just save deltas? Or entire trajectory?
     writer.write(mm.stamp, iter_est)
+
+    prev_gt = curr_gt
+    prev_feat = curr_feat
 
 writer.close()
