@@ -289,6 +289,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "evalio" },
     { name = "loam" },
+    { name = "rerun-sdk" },
     { name = "tqdm" },
 ]
 
@@ -302,6 +303,7 @@ dev = [
 requires-dist = [
     { name = "evalio", editable = "evalio" },
     { name = "loam", editable = "loam" },
+    { name = "rerun-sdk", specifier = ">=0.21.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 

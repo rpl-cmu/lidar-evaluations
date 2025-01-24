@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["evalio", "loam", "tqdm>=4.67.1"]
+dependencies = [
+    "evalio",
+    "loam",
+    "rerun-sdk>=0.21.0",
+    "tqdm>=4.67.1",
+]
 
 [tool.uv.sources]
 evalio = { workspace = true }

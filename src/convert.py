@@ -6,10 +6,7 @@ from loam import LidarParams as LoamLidarParams
 from loam import Pose3d as LoamSE3
 from loam import Quaterniond as LoamSO3
 
-from typing import Union, overload
-
-Evalio = Union[EvalioLidarParams, EvalioSE3, EvalioSO3]
-Loam = Union[LoamLidarParams, LoamSE3, LoamSO3]
+from typing import overload
 
 
 # fmt: off

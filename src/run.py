@@ -1,82 +1,90 @@
+from pathlib import Path
+from evalio.types import SE3
 import loam
-from evalio.cli.parser import DatasetBuilder
 from evalio.types import LidarMeasurement
+from tqdm import tqdm
 from convert import convert
-from gt import GroundTruthIterator
+from wrappers import GroundTruthIterator, Rerun, Writer
 import params
-
+import numpy as np
 
 # Params
 experiment_params = params.ExperimentParams(
     dataset="newer_college_2020/01_short_experiment",
     features=[params.Feature.Planar],
+    output=Path("results/test.csv"),
 )
 
 
 # Load the data
-dataset = DatasetBuilder.parse(experiment_params.dataset)[0].build()
+dataset = experiment_params.build_dataset()
 # Load ground truth in lidar frame
 gt = dataset.ground_truth()
 gt.transform_in_place(dataset.imu_T_lidar())
 gt = GroundTruthIterator(gt)
 
+# Create writer
+writer = Writer(experiment_params.output)
+rr = Rerun(to_hide=["pose/points"])
+
 # params
 lp = convert(dataset.lidar_params())
-
-feat_params = loam.FeatureExtractionParams()
-feat_params.neighbor_points = 4
-feat_params.number_sectors = 6
-feat_params.max_edge_feats_per_sector = 10
-feat_params.max_planar_feats_per_sector = 50
-
-feat_params.edge_feat_threshold = 50.0
-feat_params.planar_feat_threshold = 1.0
-
-feat_params.occlusion_thresh = 0.9
-feat_params.parallel_thresh = 0.01
+fp = experiment_params.feature_params()
+rp = experiment_params.registration_params()
 
 prev_feat = None
 prev_gt = None
-i = 0
 
-for mm in dataset:
-    if isinstance(mm, LidarMeasurement):
-        # Get everything for this step
-        pts = mm.to_vec_positions()
-        # TODO: Specify which features to keep
-        curr_feat = loam.extractFeatures(pts, lp, feat_params)
-        curr_gt = gt.next(mm.stamp)
+iter_gt = SE3.identity()
+iter_est = SE3.identity()
 
-        # Skip if we don't have everything we need
-        if curr_gt is None:
-            continue
-        if prev_feat is None or prev_gt is None:
-            prev_feat = curr_feat
-            prev_gt = curr_gt
-            i += 1
-            continue
+pbar = tqdm(iter(dataset))
+for mm in pbar:
+    if not isinstance(mm, LidarMeasurement):
+        continue
 
-        # Get initialization
-        if experiment_params.init == params.Initialization.GroundTruth:
+    # Get points in row major format
+    pts = np.asarray(mm.to_vec_positions())
+    pts = np.concatenate([pts[i :: lp.scan_lines] for i in range(lp.scan_lines)])
+    pts = list(pts)
+
+    # TODO: Specify which features to keep
+    curr_feat = loam.extractFeatures(pts, lp, fp)
+    curr_gt = gt.next(mm.stamp)
+
+    # Skip if we don't have everything we need
+    if curr_gt is None:
+        continue
+    if prev_feat is None or prev_gt is None:
+        prev_feat = curr_feat
+        prev_gt = curr_gt
+        continue
+
+    # Get initialization
+    match experiment_params.init:
+        case params.Initialization.GroundTruth:
             init = prev_gt.inverse() * curr_gt
             init = convert(init)
-        else:
-            init = loam.Pose3d.Identity()
+        case _:
+            raise ValueError("Unknown initialization")
 
-        match experiment_params.init:
-            case params.Initialization.GroundTruth:
-                init = prev_gt.inverse() * curr_gt
-                init = convert(init)
-            case _:
-                raise ValueError("Unknown initialization")
+    pose = loam.registerFeatures(curr_feat, prev_feat, init, params=rp)
+    pose = convert(pose)
 
-        pose = loam.registerFeatures(curr_feat, prev_feat, init)
-        pose = convert(pose)
-        print("pose", pose)
+    iter_gt = iter_gt * curr_gt
+    iter_est = iter_est * pose
+    rr.stamp(mm.stamp)
+    rr.log("gt", iter_gt)
+    rr.log("pose", iter_est)
+    rr.log("pose/points", mm)
+    rr.log("pose/features", curr_feat)
 
-        i += 1
+    pbar.set_description(
+        f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}"
+    )
 
-        # Save results
-        # TODO: Just save deltas? Or entire trajectory?
+    # Save results
+    # TODO: Just save deltas? Or entire trajectory?
+    writer.write(mm.stamp, iter_est)
 
-        quit()
+writer.close()
