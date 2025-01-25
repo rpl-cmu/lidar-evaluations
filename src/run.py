@@ -32,6 +32,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
 
     prev_feat = None
     prev_gt = None
+    prev_prev_gt = None
 
     iter_gt = SE3.identity()
     iter_est = SE3.identity()
@@ -69,6 +70,11 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
         match ep.init:
             case params.Initialization.GroundTruth:
                 init = convert(step_gt)
+            case params.Initialization.ConstantVelocity:
+                if prev_prev_gt is None:
+                    init = Pose3d.Identity()
+                else:
+                    init = convert(prev_prev_gt.inverse() * prev_gt)
             case params.Initialization.Identity:
                 init = Pose3d.Identity()
             case _:
@@ -107,6 +113,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
         # Saving deltas for now - maybe switch to trajectories later
         writer.write(mm.stamp, step_pose, step_gt, curr_feat)
 
+        prev_prev_gt = prev_gt
         prev_gt = curr_gt
         prev_feat = curr_feat
 

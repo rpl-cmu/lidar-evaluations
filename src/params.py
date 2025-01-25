@@ -6,17 +6,31 @@ import loam
 from evalio.cli.parser import DatasetBuilder
 
 
-class Feature(Enum):
+class PrettyPrintEnum(Enum):
+    def __repr__(self):
+        return self.name
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Feature(PrettyPrintEnum):
     Point = 0
     Edge = 1
     Planar = 2
-    # Pseudo_Planar = 3
+    Pseudo_Planar = 3
 
 
-class Initialization(Enum):
+class Initialization(PrettyPrintEnum):
     GroundTruth = 0
     ConstantVelocity = 1
     Identity = 2
+
+
+class Dewarping(PrettyPrintEnum):
+    Identity = 0
+    ConstantVelocity = 1
+    GroundTruth = 2
 
 
 @dataclass
@@ -25,14 +39,23 @@ class ExperimentParams:
     dataset: str
     features: list[Feature]
     init: Initialization = Initialization.GroundTruth
+    dewarp: Dewarping = Dewarping.Identity
+
+    @property
+    def point(self) -> bool:
+        return Feature.Point in self.features
+
+    @property
+    def edge(self) -> bool:
+        return Feature.Edge in self.features
 
     @property
     def planar(self) -> bool:
         return Feature.Planar in self.features
 
     @property
-    def edge(self) -> bool:
-        return Feature.Edge in self.features
+    def pseudo_planar(self) -> bool:
+        return Feature.Pseudo_Planar in self.features
 
     def feature_params(self) -> loam.FeatureExtractionParams:
         feat_params = loam.FeatureExtractionParams()
@@ -59,6 +82,3 @@ class ExperimentParams:
 
     def output_file(self, directory: Path) -> Path:
         return directory / self.dataset / f"{self.name}.csv"
-
-    def gt_file(self, directory: Path) -> Path:
-        return directory / self.dataset / f"{self.name}_gt.csv"

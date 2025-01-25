@@ -322,6 +322,7 @@ dependencies = [
     { name = "loam" },
     { name = "pyserde", extra = ["yaml"] },
     { name = "rerun-sdk" },
+    { name = "tabulate" },
     { name = "tqdm" },
 ]
 
@@ -338,6 +339,7 @@ requires-dist = [
     { name = "loam", editable = "loam" },
     { name = "pyserde", extras = ["yaml"], specifier = ">=0.23.0" },
     { name = "rerun-sdk", specifier = ">=0.21.0" },
+    { name = "tabulate", specifier = ">=0.9.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
 
