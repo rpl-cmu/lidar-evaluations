@@ -12,3 +12,7 @@ wheels/
 # cpp files
 .cache
 compile_commands.json
+
+# misc
+.vscode/
+results/

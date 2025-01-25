@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Sequence
 from evalio.cli.parser import DatasetBuilder
 
 import loam
@@ -21,10 +20,18 @@ class Initialization(Enum):
 
 @dataclass
 class ExperimentParams:
-    output: Path
+    name: str
     dataset: str
-    features: Sequence[Feature]
+    features: list[Feature]
     init: Initialization = Initialization.GroundTruth
+
+    @property
+    def planar(self) -> bool:
+        return Feature.Planar in self.features
+
+    @property
+    def edge(self) -> bool:
+        return Feature.Edge in self.features
 
     def feature_params(self) -> loam.FeatureExtractionParams:
         feat_params = loam.FeatureExtractionParams()
@@ -48,3 +55,9 @@ class ExperimentParams:
 
     def build_dataset(self):
         return DatasetBuilder.parse(self.dataset)[0].build()
+
+    def output_dir(self, directory: Path) -> Path:
+        return directory / self.dataset / f"{self.name}.csv"
+
+    def gt_dir(self, directory: Path) -> Path:
+        return directory / self.dataset / f"{self.name}_gt.csv"
