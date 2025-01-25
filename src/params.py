@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from evalio.cli.parser import DatasetBuilder
 
 import loam
+from evalio.cli.parser import DatasetBuilder
 
 
 class Feature(Enum):
@@ -57,8 +57,8 @@ class ExperimentParams:
     def build_dataset(self):
         return DatasetBuilder.parse(self.dataset)[0].build()
 
-    def output_dir(self, directory: Path) -> Path:
+    def output_file(self, directory: Path) -> Path:
         return directory / self.dataset / f"{self.name}.csv"
 
-    def gt_dir(self, directory: Path) -> Path:
+    def gt_file(self, directory: Path) -> Path:
         return directory / self.dataset / f"{self.name}_gt.csv"

@@ -1,7 +1,8 @@
-from run import run
-from itertools import combinations, chain
-from params import ExperimentParams, Feature
+from itertools import chain, combinations
 from pathlib import Path
+
+from params import ExperimentParams, Feature
+from run import run
 
 
 # https://docs.python.org/3/library/itertools.html#itertools-recipes

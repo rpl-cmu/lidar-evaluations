@@ -320,7 +320,7 @@ dependencies = [
     { name = "evalio" },
     { name = "gdown" },
     { name = "loam" },
-    { name = "pyserde" },
+    { name = "pyserde", extra = ["yaml"] },
     { name = "rerun-sdk" },
     { name = "tqdm" },
 ]
@@ -336,7 +336,7 @@ requires-dist = [
     { name = "evalio", editable = "evalio" },
     { name = "gdown", specifier = ">=5.2.0" },
     { name = "loam", editable = "loam" },
-    { name = "pyserde", specifier = ">=0.23.0" },
+    { name = "pyserde", extras = ["yaml"], specifier = ">=0.23.0" },
     { name = "rerun-sdk", specifier = ">=0.21.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
 ]
@@ -729,6 +729,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/73/fb/1dbfeb6b800ac2251b189ade84f4be6b3b521ab4d163be2833893c381947/pyserde-0.23.0.tar.gz", hash = "sha256:8369837982d201bc068d95eac8f63edfae66942d87b1c02c5ecadd6d14a42c4b", size = 43329 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ee/c1/0208599382b259251d33b5cbb835b15ce480621791b7a1f86dd09e9a69c5/pyserde-0.23.0-py3-none-any.whl", hash = "sha256:72ba7cc30bad1e0d6cfe3c9900ce078559c295c782a19759aa950d6009554031", size = 45244 },
+]
+
+[package.optional-dependencies]
+yaml = [
+    { name = "pyyaml" },
 ]
 
 [[package]]

@@ -1,13 +1,14 @@
 from pathlib import Path
-from evalio.types import SE3, SO3
+
 import loam
-from evalio.types import LidarMeasurement
+import numpy as np
+from evalio.types import SE3, SO3, LidarMeasurement
 from loam import Pose3d
 from tqdm import tqdm
+
+import params
 from convert import convert
 from wrappers import GroundTruthIterator, Rerun, Writer
-import params
-import numpy as np
 
 
 def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
@@ -19,8 +20,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
     gt = GroundTruthIterator(gt)
 
     # Create writer
-    writer_main = Writer(ep.output_dir(directory), feats=True)
-    writer_gt = Writer(ep.gt_dir(directory))
+    writer = Writer(directory, ep)
     rr = None
     if visualize:
         rr = Rerun(to_hide=["pose/points", "pose/features/*"])
@@ -37,7 +37,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
     iter_est = SE3.identity()
 
     data_iter = iter(dataset)
-    pbar = tqdm(total=len(data_iter))  # type: ignore
+    pbar = tqdm(total=len(data_iter), dynamic_ncols=True)  # type: ignore
 
     for mm in data_iter:
         if not isinstance(mm, LidarMeasurement):
@@ -105,13 +105,12 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
 
         # Save results
         # Saving deltas for now - maybe switch to trajectories later
-        writer_main.write(mm.stamp, step_pose, curr_feat)
-        writer_gt.write(mm.stamp, step_gt)
+        writer.write(mm.stamp, step_pose, step_gt, curr_feat)
 
         prev_gt = curr_gt
         prev_feat = curr_feat
 
-    writer_main.close()
+    writer.close()
 
 
 if __name__ == "__main__":

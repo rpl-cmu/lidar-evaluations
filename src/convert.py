@@ -1,12 +1,11 @@
-from evalio.types import LidarParams as EvalioLidarParams
+from typing import overload
+
 from evalio.types import SE3 as EvalioSE3
 from evalio.types import SO3 as EvalioSO3
-
+from evalio.types import LidarParams as EvalioLidarParams
 from loam import LidarParams as LoamLidarParams
 from loam import Pose3d as LoamSE3
 from loam import Quaterniond as LoamSO3
-
-from typing import overload
 
 
 # fmt: off

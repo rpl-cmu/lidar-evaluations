@@ -3,11 +3,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
-from evalio.types import SE3, Stamp, Trajectory, LidarMeasurement
 import loam
+import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
+from evalio.types import SE3, LidarMeasurement, Stamp, Trajectory
+from serde.yaml import to_yaml
+
+from params import ExperimentParams
 
 
 @dataclass
@@ -29,36 +32,42 @@ class GroundTruthIterator:
 
 
 class Writer:
-    def __init__(self, file: Path, feats: bool = False):
+    def __init__(self, path: Path, ep: ExperimentParams):
+        file = ep.output_file(path)
         file.parent.mkdir(parents=True, exist_ok=True)
 
         self.file = open(file, "w")
-        self.file.write("# timestamp, x, y, z, qx, qy, qz, qw")
-        if feats:
-            self.file.write(", edge, planar")
-        self.file.write("\n")
-
+        params = "# " + to_yaml(ep).replace("\n", "\n# ")
+        self.file.write(params + "\n")
+        self.file.write(
+            "# timestamp, x, y, z, qx, qy, qz, qw, gt_x, gt_y, gt_z, gt_qx, gt_qy, gt_qz, gt_qw, edge, planar\n"
+        )
         self.writer = csv.writer(self.file)
+
         self.index = 0
 
-    def write(self, stamp: Stamp, pose: SE3, feats: Optional[loam.LoamFeatures] = None):
-        row = [
-            stamp.to_sec(),
-            pose.trans[0],
-            pose.trans[1],
-            pose.trans[2],
-            pose.rot.qx,
-            pose.rot.qy,
-            pose.rot.qz,
-            pose.rot.qw,
-        ]
-        if feats is not None:
-            row += [
+    def write(self, stamp: Stamp, pose: SE3, gt: SE3, feats: loam.LoamFeatures):
+        self.writer.writerow(
+            [
+                stamp.to_sec(),
+                pose.trans[0],
+                pose.trans[1],
+                pose.trans[2],
+                pose.rot.qx,
+                pose.rot.qy,
+                pose.rot.qz,
+                pose.rot.qw,
+                gt.trans[0],
+                gt.trans[1],
+                gt.trans[2],
+                gt.rot.qx,
+                gt.rot.qy,
+                gt.rot.qz,
+                gt.rot.qw,
                 len(feats.edge_points),
                 len(feats.planar_points),
             ]
-
-        self.writer.writerow(row)
+        )
         self.index += 1
 
     def close(self):
