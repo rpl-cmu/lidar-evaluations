@@ -8,7 +8,7 @@ dependencies = [
     "evalio",
     "gdown>=5.2.0",
     "loam",
-    "pyserde>=0.23.0",
+    "pyserde[yaml]>=0.23.0",
     "rerun-sdk>=0.21.0",
     "tqdm>=4.67.1",
 ]

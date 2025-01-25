@@ -29,29 +29,36 @@ class GroundTruthIterator:
 
 
 class Writer:
-    def __init__(self, file: Path):
+    def __init__(self, file: Path, feats: bool = False):
         file.parent.mkdir(parents=True, exist_ok=True)
 
         self.file = open(file, "w")
-        self.file.write("#\n")
-        self.file.write("# timestamp, x, y, z, qx, qy, qz, qw\n")
+        self.file.write("# timestamp, x, y, z, qx, qy, qz, qw")
+        if feats:
+            self.file.write(", edge, planar")
+        self.file.write("\n")
 
         self.writer = csv.writer(self.file)
         self.index = 0
 
-    def write(self, stamp: Stamp, pose: SE3):
-        self.writer.writerow(
-            [
-                stamp.to_sec(),
-                pose.trans[0],
-                pose.trans[1],
-                pose.trans[2],
-                pose.rot.qx,
-                pose.rot.qy,
-                pose.rot.qz,
-                pose.rot.qw,
+    def write(self, stamp: Stamp, pose: SE3, feats: Optional[loam.LoamFeatures] = None):
+        row = [
+            stamp.to_sec(),
+            pose.trans[0],
+            pose.trans[1],
+            pose.trans[2],
+            pose.rot.qx,
+            pose.rot.qy,
+            pose.rot.qz,
+            pose.rot.qw,
+        ]
+        if feats is not None:
+            row += [
+                len(feats.edge_points),
+                len(feats.planar_points),
             ]
-        )
+
+        self.writer.writerow(row)
         self.index += 1
 
     def close(self):

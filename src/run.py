@@ -1,7 +1,8 @@
 from pathlib import Path
-from evalio.types import SE3
+from evalio.types import SE3, SO3
 import loam
 from evalio.types import LidarMeasurement
+from loam import Pose3d
 from tqdm import tqdm
 from convert import convert
 from wrappers import GroundTruthIterator, Rerun, Writer
@@ -18,7 +19,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
     gt = GroundTruthIterator(gt)
 
     # Create writer
-    writer_main = Writer(ep.output_dir(directory))
+    writer_main = Writer(ep.output_dir(directory), feats=True)
     writer_gt = Writer(ep.gt_dir(directory))
     rr = None
     if visualize:
@@ -47,9 +48,13 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
         pts = np.concatenate([pts[i :: lp.scan_lines] for i in range(lp.scan_lines)])
         pts = list(pts)
 
-        # TODO: Specify which features to keep
-        curr_feat = loam.extractFeatures(pts, lp, fp)
+        # Get features and ground truth
         curr_gt = gt.next(mm.stamp)
+        curr_feat = loam.extractFeatures(pts, lp, fp)
+        if not ep.planar:
+            curr_feat.planar_points = []
+        if not ep.edge:
+            curr_feat.edge_points = []
 
         # Skip if we don't have everything we need
         if curr_gt is None:
@@ -64,20 +69,34 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
         match ep.init:
             case params.Initialization.GroundTruth:
                 init = convert(step_gt)
+            case params.Initialization.Identity:
+                init = Pose3d.Identity()
             case _:
                 raise ValueError("Unknown initialization")
 
-        step_pose = loam.registerFeatures(curr_feat, prev_feat, init, params=rp)
-        step_pose = convert(step_pose)
+        try:
+            step_pose = loam.registerFeatures(curr_feat, prev_feat, init, params=rp)
+            step_pose = convert(step_pose)
 
-        iter_gt = iter_gt * step_gt
-        iter_est = iter_est * step_pose
-        if rr is not None:
-            rr.stamp(mm.stamp)
-            rr.log("gt", iter_gt)
-            rr.log("pose", iter_est)
-            rr.log("pose/points", mm)
-            rr.log("pose/features", curr_feat)
+            # Also skipping iter_gt to not compound bad results if failed
+            iter_gt = iter_gt * step_gt
+            iter_est = iter_est * step_pose
+            if rr is not None:
+                rr.stamp(mm.stamp)
+                rr.log("gt", iter_gt)
+                rr.log("pose", iter_est)
+                rr.log("pose/points", mm)
+                rr.log("pose/features", curr_feat)
+
+        except Exception as e:
+            print("Registration failed, replacing with nan")
+            print(f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}")
+            print("Stamp:", mm.stamp)
+            print(e)
+            step_pose = SE3(
+                SO3(qx=np.nan, qy=np.nan, qz=np.nan, qw=np.nan),
+                np.array([np.nan, np.nan, np.nan]),
+            )
 
         pbar.set_description(
             f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}"
@@ -86,7 +105,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
 
         # Save results
         # Saving deltas for now - maybe switch to trajectories later
-        writer_main.write(mm.stamp, step_pose)
+        writer_main.write(mm.stamp, step_pose, curr_feat)
         writer_gt.write(mm.stamp, step_gt)
 
         prev_gt = curr_gt

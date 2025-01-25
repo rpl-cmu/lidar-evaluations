@@ -16,6 +16,7 @@ class Feature(Enum):
 class Initialization(Enum):
     GroundTruth = 0
     ConstantVelocity = 1
+    Identity = 2
 
 
 @dataclass
