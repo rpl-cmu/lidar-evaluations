@@ -74,7 +74,7 @@ class ExperimentParams:
 
     def registration_params(self) -> loam.RegistrationParams:
         reg_params = loam.RegistrationParams()
-        reg_params.max_iterations = 80
+        reg_params.max_iterations = 20
         return reg_params
 
     def build_dataset(self):
@@ -82,3 +82,6 @@ class ExperimentParams:
 
     def output_file(self, directory: Path) -> Path:
         return directory / self.dataset / f"{self.name}.csv"
+
+    def debug_file(self, directory: Path) -> Path:
+        return directory / self.dataset / f"{self.name}.log"

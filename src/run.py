@@ -10,8 +10,15 @@ import params
 from convert import convert
 from wrappers import GroundTruthIterator, Rerun, Writer
 
+from multiprocessing import current_process
 
-def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
+
+def run(
+    ep: params.ExperimentParams,
+    directory: Path,
+    multithreaded: bool = False,
+    visualize: bool = False,
+):
     # Load the data
     dataset = ep.build_dataset()
     # Load ground truth in lidar frame
@@ -21,6 +28,7 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
 
     # Create writer
     writer = Writer(directory, ep)
+    writer.log(f"Starting experiment {ep.name}")
     rr = None
     if visualize:
         rr = Rerun(to_hide=["pose/points", "pose/features/*"])
@@ -38,7 +46,13 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
     iter_est = SE3.identity()
 
     data_iter = iter(dataset)
-    pbar = tqdm(total=len(data_iter), dynamic_ncols=True)  # type: ignore
+    pbar_params = {"total": len(data_iter), "dynamic_ncols": True}  # type: ignore
+    pbar_desc = "E: {}, P: {}"
+    if multithreaded:
+        idx = current_process()._identity[0] - 1
+        pbar_params["position"] = idx
+        pbar_desc = f"{idx}, ds: {ep.dataset}, " + pbar_desc
+    pbar = tqdm(**pbar_params)
 
     for mm in data_iter:
         if not isinstance(mm, LidarMeasurement):
@@ -94,24 +108,26 @@ def run(ep: params.ExperimentParams, directory: Path, visualize: bool = False):
                 rr.log("pose/points", mm)
                 rr.log("pose/features", curr_feat)
 
+            # Save results
+            # Saving deltas for now - maybe switch to trajectories later
+            writer.write(mm.stamp, step_pose, step_gt, curr_feat)
+
         except Exception as e:
-            print("Registration failed, replacing with nan")
-            print(f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}")
-            print("Stamp:", mm.stamp)
-            print(e)
+            writer.error("Registration failed, replacing with nan")
+            writer.error(
+                f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}"
+            )
+            writer.error(f"Stamp: {mm.stamp}")
+            writer.error(e)
             step_pose = SE3(
                 SO3(qx=np.nan, qy=np.nan, qz=np.nan, qw=np.nan),
                 np.array([np.nan, np.nan, np.nan]),
             )
 
         pbar.set_description(
-            f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}"
+            pbar_desc.format(len(curr_feat.edge_points), len(curr_feat.planar_points))
         )
         pbar.update()
-
-        # Save results
-        # Saving deltas for now - maybe switch to trajectories later
-        writer.write(mm.stamp, step_pose, step_gt, curr_feat)
 
         prev_prev_gt = prev_gt
         prev_gt = curr_gt

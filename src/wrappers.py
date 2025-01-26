@@ -34,6 +34,7 @@ class GroundTruthIterator:
 class Writer:
     def __init__(self, path: Path, ep: ExperimentParams):
         file = ep.output_file(path)
+        debug = ep.debug_file(path)
         file.parent.mkdir(parents=True, exist_ok=True)
 
         self.file = open(file, "w")
@@ -44,7 +45,7 @@ class Writer:
         )
         self.writer = csv.writer(self.file)
 
-        self.index = 0
+        self.debug = open(debug, "w")
 
     def write(self, stamp: Stamp, pose: SE3, gt: SE3, feats: loam.LoamFeatures):
         self.writer.writerow(
@@ -68,10 +69,16 @@ class Writer:
                 len(feats.planar_points),
             ]
         )
-        self.index += 1
 
     def close(self):
         self.file.close()
+        self.debug.close()
+
+    def log(self, msg):
+        self.debug.write(msg + "\n")
+
+    def error(self, e):
+        self.debug.write("ERROR: " + str(e) + "\n")
 
 
 class Rerun:

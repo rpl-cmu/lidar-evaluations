@@ -4,6 +4,12 @@ from pathlib import Path
 from params import ExperimentParams, Feature
 from run import run
 
+from multiprocessing import Pool
+from tqdm import tqdm
+
+# For handling multiple progress bars
+# https://stackoverflow.com/questions/56665639/fix-jumping-of-multiple-progress-bars-tqdm-in-python-multiprocessing
+
 
 # https://docs.python.org/3/library/itertools.html#itertools-recipes
 def powerset(iterable):
@@ -18,8 +24,9 @@ features = [Feature.Planar, Feature.Edge]
 datasets = [
     "newer_college_2020/01_short_experiment",
     "newer_college_2020/02_long_experiment",
-    "newer_college_2021/quad-easy",
-    "newer_college_2021/maths-easy",
+    # TODO: Something seems broken with these datasets, not getting any planar features
+    # "newer_college_2021/quad-easy",
+    # "newer_college_2021/maths-easy",
 ]
 
 eps = []
@@ -29,8 +36,15 @@ for dataset in datasets:
         ep = ExperimentParams(name=name, dataset=dataset, features=list(feature_set))
         eps.append(ep)
 
+args = [(ep, dir, True) for ep in eps]
 
 print(f"Running {len(eps)} experiments")
-for ep in eps:
-    print(f"Beginning experiment {ep.name} on dataset {ep.dataset}")
-    run(ep, dir)
+with Pool(10, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
+    p.starmap(run, args)
+
+# for i, ep in eps:
+#     # print(f"Beginning experiment {ep.name} on dataset {ep.dataset}")
+#     pool.apply_async(run, args=(ep, dir, i))
+
+# pool.close()
+# pool.join()
