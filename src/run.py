@@ -18,6 +18,7 @@ def run(
     directory: Path,
     multithreaded: bool = False,
     visualize: bool = False,
+    ip: str = "0.0.0.0:9876",
 ):
     # Load the data
     dataset = ep.build_dataset()
@@ -31,7 +32,7 @@ def run(
     writer.log(f"Starting experiment {ep.name}")
     rr = None
     if visualize:
-        rr = Rerun(to_hide=["pose/points", "pose/features/*"])
+        rr = Rerun(to_hide=["pose/points", "pose/features/*"], ip=ip)
 
     # params
     lp = convert(dataset.lidar_params())
@@ -147,4 +148,4 @@ if __name__ == "__main__":
         dataset="newer_college_2021/quad-easy",
         features=[params.Feature.Planar, params.Feature.Edge],
     )
-    run(ep, Path("results"), visualize=False)
+    run(ep, Path("results"), visualize=True, ip="172.31.76.216:9876")

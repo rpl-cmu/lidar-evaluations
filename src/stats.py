@@ -14,12 +14,18 @@ from tabulate import tabulate
 
 
 @dataclass(kw_only=True)
+class Ate:
+    trans: float
+    rot: float
+
+
+@dataclass(kw_only=True)
 class Experiment:
     params: ExperimentParams
     stamps: list[Stamp]
     poses: list[SE3]
     gt: list[SE3]
-    features: dict[Feature, list[int]]
+    features: dict[Feature, np.ndarray]
 
     def __post_init__(self):
         assert len(self.stamps) == len(self.poses)
@@ -30,11 +36,26 @@ class Experiment:
     def __len__(self) -> int:
         return len(self.stamps)
 
+    def ate(self) -> Ate:
+        """
+        Computes the Absolute Trajectory Error
+        """
+        assert len(self.gt) == len(self.poses)
+        assert len(self.gt) == len(self.stamps)
 
-@dataclass(kw_only=True)
-class Ate:
-    trans: float
-    rot: float
+        error_t = 0.0
+        error_r = 0.0
+        for gt, pose in zip(self.gt, self.poses):
+            error_t += float(np.linalg.norm(gt.trans - pose.trans))
+            error_r += float(np.linalg.norm((gt.rot * pose.rot.inverse()).log()))
+
+        error_t /= len(self.gt)
+        error_r /= len(self.gt)
+
+        return Ate(rot=error_r, trans=error_t)
+
+    def get_feature(self, feature: Feature) -> np.ndarray:
+        return self.features[feature]
 
 
 def load(path: Path) -> Experiment:
@@ -116,27 +137,8 @@ def load(path: Path) -> Experiment:
         stamps=stamps,
         poses=poses,
         gt=gts,
-        features={Feature.Edge: edges, Feature.Planar: planars},
+        features={Feature.Edge: np.asarray(edges), Feature.Planar: np.asarray(planars)},
     )
-
-
-def compute_ate(exp: Experiment) -> Ate:
-    """
-    Computes the Absolute Trajectory Error
-    """
-    assert len(exp.gt) == len(exp.poses)
-    assert len(exp.gt) == len(exp.stamps)
-
-    error_t = 0.0
-    error_r = 0.0
-    for gt, pose in zip(exp.gt, exp.poses):
-        error_t += float(np.linalg.norm(gt.trans - pose.trans))
-        error_r += float(np.linalg.norm((gt.rot * pose.rot.inverse()).log()))
-
-    error_t /= len(exp.gt)
-    error_r /= len(exp.gt)
-
-    return Ate(rot=error_r, trans=error_t)
 
 
 def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
@@ -146,11 +148,11 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
         traj = load(file_path)
         experiments.append(traj)
 
-    header = ["ATEt", "ATEr", "features", "init", "dewarp"]
+    header = ["ATEt", "ATEr", "features", "init", "dewarp", "edge", "planar"]
 
     results = []
     for exp in experiments:
-        ate = compute_ate(exp)
+        ate = exp.ate()
         results.append(
             [
                 ate.trans,
@@ -158,6 +160,8 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
                 exp.params.features,
                 exp.params.init,
                 exp.params.dewarp,
+                exp.get_feature(Feature.Edge).mean(),
+                exp.get_feature(Feature.Planar).mean(),
             ]
         )
 
@@ -184,7 +188,9 @@ def eval(directories: list[Path], visualize: bool, sort: Optional[str] = None):
                 bottom_level_dirs.append(subdir)
 
     for d in bottom_level_dirs:
+        print(f"Results for {d}")
         eval_dataset(d, visualize, sort)
+        print()
 
 
 if __name__ == "__main__":
