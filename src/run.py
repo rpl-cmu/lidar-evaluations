@@ -47,21 +47,25 @@ def run(
 
     data_iter = iter(dataset)
     pbar_params = {"total": len(data_iter), "dynamic_ncols": True}  # type: ignore
-    pbar_desc = "E: {}, P: {}"
+    pbar_desc = f"{ep.short_info()} - E: {{}}, P: {{}}"
     if multithreaded:
         idx = current_process()._identity[0] - 1
         pbar_params["position"] = idx
-        pbar_desc = f"{idx}, ds: {ep.dataset}, " + pbar_desc
+        pbar_desc = f"{idx}, " + pbar_desc
     pbar = tqdm(**pbar_params)
 
     for mm in data_iter:
         if not isinstance(mm, LidarMeasurement):
             continue
 
-        # Get points in row major format
-        pts = np.asarray(mm.to_vec_positions())
-        pts = np.concatenate([pts[i :: lp.scan_lines] for i in range(lp.scan_lines)])
-        pts = list(pts)
+        # Get points in row major format if it's in column major
+        pts = mm.to_vec_positions()
+        if mm.points[0].row != mm.points[1].row:
+            pts = np.asarray(pts)
+            pts = np.concatenate(
+                [pts[i :: lp.scan_lines] for i in range(lp.scan_lines)]
+            )
+            pts = list(pts)
 
         # Get features and ground truth
         curr_gt = gt.next(mm.stamp)
@@ -139,7 +143,8 @@ def run(
 if __name__ == "__main__":
     ep = params.ExperimentParams(
         name="test",
-        dataset="newer_college_2020/01_short_experiment",
-        features=[params.Feature.Planar],
+        # dataset="newer_college_2020/01_short_experiment",
+        dataset="newer_college_2021/quad-easy",
+        features=[params.Feature.Planar, params.Feature.Edge],
     )
     run(ep, Path("results"), visualize=False)

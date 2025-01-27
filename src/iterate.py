@@ -1,13 +1,13 @@
-from itertools import chain, combinations
+from itertools import chain, combinations, product
 from pathlib import Path
 
-from params import ExperimentParams, Feature
+from params import ExperimentParams, Feature, Initialization
 from run import run
 
 from multiprocessing import Pool
 from tqdm import tqdm
 
-# For handling multiple progress bars
+# For handling multiple tqdm progress bars
 # https://stackoverflow.com/questions/56665639/fix-jumping-of-multiple-progress-bars-tqdm-in-python-multiprocessing
 
 
@@ -19,32 +19,40 @@ def powerset(iterable):
     return chain.from_iterable(combinations(s, r) for r in range(1, len(s) + 1))
 
 
+# ------------------------- Everything to sweep over ------------------------- #
+num_threads = 15
 dir = Path("results/first_run")
-features = [Feature.Planar, Feature.Edge]
+
+features = powerset([Feature.Planar, Feature.Edge])
+
 datasets = [
     "newer_college_2020/01_short_experiment",
     "newer_college_2020/02_long_experiment",
-    # TODO: Something seems broken with these datasets, not getting any planar features
+    "newer_college_2020/07_parkland_mound",
+    # TODO: Getting WAY too many features out, needs to visualize to make sure everything is ok
+    # May be due to being a high res lidar
     # "newer_college_2021/quad-easy",
     # "newer_college_2021/maths-easy",
 ]
 
-eps = []
-for dataset in datasets:
-    for feature_set in powerset(features):
-        name = "_".join(f.name.lower() for f in feature_set)
-        ep = ExperimentParams(name=name, dataset=dataset, features=list(feature_set))
-        eps.append(ep)
+init = [
+    Initialization.ConstantVelocity,
+    Initialization.GroundTruth,
+    Initialization.Identity,
+]
 
-args = [(ep, dir, True) for ep in eps]
+# ------------------------- Computer product of options ------------------------- #
+experiments = [
+    ExperimentParams(
+        name=f"{i.name.lower()}_{'_'.join(j.name.lower() for j in f)}",
+        dataset=d,
+        features=list(f),
+        init=i,
+    )
+    for d, f, i in product(datasets, features, init)
+]
+args = [(e, dir, True) for e in experiments]
 
-print(f"Running {len(eps)} experiments")
-with Pool(10, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
+print(f"Running {len(experiments)} experiments")
+with Pool(num_threads, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
     p.starmap(run, args)
-
-# for i, ep in eps:
-#     # print(f"Beginning experiment {ep.name} on dataset {ep.dataset}")
-#     pool.apply_async(run, args=(ep, dir, i))
-
-# pool.close()
-# pool.join()

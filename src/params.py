@@ -6,6 +6,10 @@ import loam
 from evalio.cli.parser import DatasetBuilder
 
 
+def uppers(s: str) -> str:
+    return "".join(c for c in s if c.isupper())
+
+
 class PrettyPrintEnum(Enum):
     def __repr__(self):
         return self.name
@@ -85,3 +89,12 @@ class ExperimentParams:
 
     def debug_file(self, directory: Path) -> Path:
         return directory / self.dataset / f"{self.name}.log"
+
+    def short_info(self) -> str:
+        ds, seq = self.dataset.split("/")
+        ds = ds[:3] + ds[-2:] + "/" + seq[:2]
+        f = "".join(uppers(f.name) for f in self.features)
+        i = uppers(self.init.name)
+        d = uppers(self.dewarp.name)
+
+        return f"ds: {ds}, f: {f}, i: {i}, d: {d}"
