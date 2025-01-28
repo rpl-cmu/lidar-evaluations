@@ -41,7 +41,7 @@ class Writer:
         params = "# " + to_yaml(ep).replace("\n", "\n# ")
         self.file.write(params + "\n")
         self.file.write(
-            "# timestamp, x, y, z, qx, qy, qz, qw, gt_x, gt_y, gt_z, gt_qx, gt_qy, gt_qz, gt_qw, edge, planar\n"
+            "# timestamp, x, y, z, qx, qy, qz, qw, gt_x, gt_y, gt_z, gt_qx, gt_qy, gt_qz, gt_qw, point, edge, planar\n"
         )
         self.writer = csv.writer(self.file)
 
@@ -65,6 +65,7 @@ class Writer:
                 gt.rot.qy,
                 gt.rot.qz,
                 gt.rot.qw,
+                len(feats.point_points),
                 len(feats.edge_points),
                 len(feats.planar_points),
             ]

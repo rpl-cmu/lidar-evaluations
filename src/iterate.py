@@ -26,13 +26,11 @@ dir = Path("results/first_run")
 features = powerset([Feature.Planar, Feature.Edge])
 
 datasets = [
-    "newer_college_2020/01_short_experiment",
-    "newer_college_2020/02_long_experiment",
-    "newer_college_2020/07_parkland_mound",
-    # TODO: Getting WAY too many features out, needs to visualize to make sure everything is ok
-    # May be due to being a high res lidar
-    # "newer_college_2021/quad-easy",
-    # "newer_college_2021/maths-easy",
+    # "newer_college_2020/01_short_experiment",
+    # "newer_college_2020/02_long_experiment",
+    # "newer_college_2020/07_parkland_mound",
+    "newer_college_2021/quad-easy",
+    "newer_college_2021/maths-easy",
 ]
 
 init = [

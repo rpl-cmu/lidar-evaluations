@@ -31,6 +31,7 @@ class Experiment:
     def __post_init__(self):
         assert len(self.stamps) == len(self.poses)
         assert len(self.stamps) == len(self.gt)
+        assert len(self.stamps) == len(self.features[Feature.Point])
         assert len(self.stamps) == len(self.features[Feature.Edge])
         assert len(self.stamps) == len(self.features[Feature.Planar])
 
@@ -105,6 +106,7 @@ def load(path: Path) -> Experiment:
         "gt_qy",
         "gt_qz",
         "gt_qw",
+        "point",
         "edge",
         "planar",
     ]
@@ -112,6 +114,7 @@ def load(path: Path) -> Experiment:
     poses = []
     gts = []
     stamps = []
+    points = []
     edges = []
     planars = []
 
@@ -155,6 +158,7 @@ def load(path: Path) -> Experiment:
             else:
                 stamp = Stamp(sec=int(line["sec"]), nsec=int(line["nsec"]))
 
+            points.append(int(line["point"]))
             edges.append(int(line["edge"]))
             planars.append(int(line["planar"]))
 
@@ -167,7 +171,11 @@ def load(path: Path) -> Experiment:
         stamps=stamps,
         poses=poses,
         gt=gts,
-        features={Feature.Edge: np.asarray(edges), Feature.Planar: np.asarray(planars)},
+        features={
+            Feature.Point: np.asarray(points),
+            Feature.Edge: np.asarray(edges),
+            Feature.Planar: np.asarray(planars),
+        },
     )
 
 
@@ -186,6 +194,7 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
         "features",
         "init",
         "dewarp",
+        "point",
         "edge",
         "planar",
     ]
@@ -203,6 +212,7 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
                 exp.params.features,
                 exp.params.init,
                 exp.params.dewarp,
+                exp.get_feature(Feature.Point).mean(),
                 exp.get_feature(Feature.Edge).mean(),
                 exp.get_feature(Feature.Planar).mean(),
             ]

@@ -77,7 +77,7 @@ def run(
         # Get features and ground truth
         curr_gt = gt.next(mm.stamp)
         curr_feat = loam.extractFeatures(pts, lp, fp)
-        if not ep.planar:
+        if not ep.planar and not ep.pseudo_planar:
             curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
             curr_feat.planar_points = []
         if not ep.edge:
@@ -85,10 +85,6 @@ def run(
             curr_feat.edge_points = []
         if not ep.point:
             curr_feat.point_points = []
-        # print(f"Stamp: {mm.stamp}")
-        # print(f"Number of edge points: {len(curr_feat.edge_points)}")
-        # print(f"Number of planar points: {len(curr_feat.planar_points)}")
-        # print(f"Number of point points: {len(curr_feat.point_points)}")
 
         # Skip if we don't have everything we need
         if curr_gt is None:
@@ -161,27 +157,40 @@ def run(
 
 
 if __name__ == "__main__":
+    from multiprocessing import Pool
+    from functools import partial
+
     eps = [
-        # params.ExperimentParams(
-        #     name="planar",
-        #     dataset="newer_college_2020/01_short_experiment",
-        #     # dataset="newer_college_2021/quad-easy",
-        #     init=params.Initialization.Identity,
-        #     features=[params.Feature.Planar],
-        # ),
+        params.ExperimentParams(
+            name="pseudo_planar",
+            dataset="newer_college_2020/01_short_experiment",
+            init=params.Initialization.Identity,
+            features=[params.Feature.Pseudo_Planar],
+        ),
+        params.ExperimentParams(
+            name="planar",
+            dataset="newer_college_2020/01_short_experiment",
+            init=params.Initialization.Identity,
+            features=[params.Feature.Planar],
+        ),
         params.ExperimentParams(
             name="planar_edge",
             dataset="newer_college_2020/01_short_experiment",
-            # dataset="newer_college_2021/quad-easy",
             init=params.Initialization.Identity,
             features=[params.Feature.Planar, params.Feature.Edge],
         ),
     ]
-    for ep in eps:
-        run(
-            ep,
-            Path("results/recreate_experiment_2.0"),
-            visualize=False,
-            length=1000,
-            ip="172.31.77.21:9876",
+
+    directory = Path("results/psuedo_planar_2.0")
+    length = 1000
+
+    with Pool(10, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
+        p.map(
+            partial(
+                run,
+                directory=directory,
+                multithreaded=True,
+                length=length,
+            ),
+            eps,
         )

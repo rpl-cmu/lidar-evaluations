@@ -45,6 +45,12 @@ class ExperimentParams:
     init: Initialization = Initialization.GroundTruth
     dewarp: Dewarping = Dewarping.Identity
 
+    def __post_init__(self):
+        assert len(self.features) > 0, "At least one feature must be selected"
+        assert not (self.planar and self.pseudo_planar), (
+            "Cannot have both planar and pseudo-planar features"
+        )
+
     @property
     def point(self) -> bool:
         return Feature.Point in self.features
@@ -80,6 +86,12 @@ class ExperimentParams:
     def registration_params(self) -> loam.RegistrationParams:
         reg_params = loam.RegistrationParams()
         reg_params.max_iterations = 20
+        # TODO: This could probably use some tuning!
+        reg_params.pseudo_plane_normal_epsilon = 0.1
+
+        if self.pseudo_planar:
+            reg_params.planar_version = loam.PlanarVersion.PSEUDO_PLANAR
+
         return reg_params
 
     def build_dataset(self):
