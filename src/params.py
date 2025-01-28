@@ -67,6 +67,7 @@ class ExperimentParams:
         feat_params.number_sectors = 6
         feat_params.max_edge_feats_per_sector = 10
         feat_params.max_planar_feats_per_sector = 50
+        feat_params.max_point_feats_per_sector = 50
 
         feat_params.edge_feat_threshold = 50.0
         feat_params.planar_feat_threshold = 1.0
@@ -93,8 +94,8 @@ class ExperimentParams:
     def short_info(self) -> str:
         ds, seq = self.dataset.split("/")
         ds = ds[:3] + ds[-2:] + "/" + seq[:2]
-        f = "".join(uppers(f.name) for f in self.features)
+        f = "/".join(f.name[:2] for f in self.features)
         i = uppers(self.init.name)
         d = uppers(self.dewarp.name)
 
-        return f"ds: {ds}, f: {f}, i: {i}, d: {d}"
+        return f"ds: {ds}, feat: {f}, init: {i}, dew: {d}"

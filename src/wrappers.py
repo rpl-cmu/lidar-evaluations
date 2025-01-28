@@ -108,9 +108,12 @@ class Rerun:
         color: list[int] = [0, 0, 255],
     ):
         if isinstance(value, loam.LoamFeatures):
-            rr.log(f"{name}/edges", rr.Points3D(value.edge_points, colors=[255, 0, 0]))
+            rr.log(f"{name}/edges", rr.Points3D(value.edge_points, colors=[150, 0, 0]))
             rr.log(
-                f"{name}/planar", rr.Points3D(value.planar_points, colors=[0, 255, 0])
+                f"{name}/planar", rr.Points3D(value.planar_points, colors=[0, 150, 0])
+            )
+            rr.log(
+                f"{name}/points", rr.Points3D(value.point_points, colors=[0, 0, 150])
             )
         elif isinstance(value, SE3):
             pose = rr.Transform3D(

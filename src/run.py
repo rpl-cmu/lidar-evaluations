@@ -12,12 +12,15 @@ from wrappers import GroundTruthIterator, Rerun, Writer
 
 from multiprocessing import current_process
 
+from typing import Optional
+
 
 def run(
     ep: params.ExperimentParams,
     directory: Path,
     multithreaded: bool = False,
     visualize: bool = False,
+    length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
 ):
     # Load the data
@@ -48,12 +51,15 @@ def run(
 
     data_iter = iter(dataset)
     pbar_params = {"total": len(data_iter), "dynamic_ncols": True}  # type: ignore
-    pbar_desc = f"{ep.short_info()} - E: {{}}, P: {{}}"
+    if length is not None:
+        pbar_params["total"] = length
+    pbar_desc = f"[{ep.short_info()}] Ed: {{}}, Pl: {{}}, Po: {{}}"
     if multithreaded:
         idx = current_process()._identity[0] - 1
         pbar_params["position"] = idx
         pbar_desc = f"{idx}, " + pbar_desc
     pbar = tqdm(**pbar_params)
+    idx = 0
 
     for mm in data_iter:
         if not isinstance(mm, LidarMeasurement):
@@ -72,9 +78,17 @@ def run(
         curr_gt = gt.next(mm.stamp)
         curr_feat = loam.extractFeatures(pts, lp, fp)
         if not ep.planar:
+            curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
             curr_feat.planar_points = []
         if not ep.edge:
+            curr_feat.point_points = curr_feat.point_points + curr_feat.edge_points
             curr_feat.edge_points = []
+        if not ep.point:
+            curr_feat.point_points = []
+        # print(f"Stamp: {mm.stamp}")
+        # print(f"Number of edge points: {len(curr_feat.edge_points)}")
+        # print(f"Number of planar points: {len(curr_feat.planar_points)}")
+        # print(f"Number of point points: {len(curr_feat.point_points)}")
 
         # Skip if we don't have everything we need
         if curr_gt is None:
@@ -119,9 +133,6 @@ def run(
 
         except Exception as e:
             writer.error("Registration failed, replacing with nan")
-            writer.error(
-                f"E: {len(curr_feat.edge_points)}, P: {len(curr_feat.planar_points)}"
-            )
             writer.error(f"Stamp: {mm.stamp}")
             writer.error(e)
             step_pose = SE3(
@@ -130,7 +141,11 @@ def run(
             )
 
         pbar.set_description(
-            pbar_desc.format(len(curr_feat.edge_points), len(curr_feat.planar_points))
+            pbar_desc.format(
+                len(curr_feat.edge_points),
+                len(curr_feat.planar_points),
+                len(curr_feat.point_points),
+            )
         )
         pbar.update()
 
@@ -138,14 +153,35 @@ def run(
         prev_gt = curr_gt
         prev_feat = curr_feat
 
+        if length is not None and idx >= length:
+            break
+        idx += 1
+
     writer.close()
 
 
 if __name__ == "__main__":
-    ep = params.ExperimentParams(
-        name="test",
-        # dataset="newer_college_2020/01_short_experiment",
-        dataset="newer_college_2021/quad-easy",
-        features=[params.Feature.Planar, params.Feature.Edge],
-    )
-    run(ep, Path("results"), visualize=True, ip="172.31.76.216:9876")
+    eps = [
+        # params.ExperimentParams(
+        #     name="planar",
+        #     dataset="newer_college_2020/01_short_experiment",
+        #     # dataset="newer_college_2021/quad-easy",
+        #     init=params.Initialization.Identity,
+        #     features=[params.Feature.Planar],
+        # ),
+        params.ExperimentParams(
+            name="planar_edge",
+            dataset="newer_college_2020/01_short_experiment",
+            # dataset="newer_college_2021/quad-easy",
+            init=params.Initialization.Identity,
+            features=[params.Feature.Planar, params.Feature.Edge],
+        ),
+    ]
+    for ep in eps:
+        run(
+            ep,
+            Path("results/recreate_experiment_2.0"),
+            visualize=False,
+            length=1000,
+            ip="172.31.77.21:9876",
+        )

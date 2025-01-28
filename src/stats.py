@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from evalio.types import SE3, SO3, Stamp
 
+from functools import cached_property
 from serde.yaml import from_yaml
 
 from params import ExperimentParams, Feature
@@ -35,6 +36,35 @@ class Experiment:
 
     def __len__(self) -> int:
         return len(self.stamps)
+
+    @cached_property
+    def iterated_gt(self) -> list[SE3]:
+        iterated_gt = [self.gt[0]]
+        for i in range(1, len(self.gt)):
+            iterated_gt.append(iterated_gt[-1] * self.gt[i])
+        return iterated_gt
+
+    @cached_property
+    def iterated_poses(self) -> list[SE3]:
+        iterated_poses = [self.poses[0]]
+        for i in range(1, len(self.poses)):
+            iterated_poses.append(iterated_poses[-1] * self.poses[i])
+        return iterated_poses
+
+    def iterated_ate(self) -> Ate:
+        assert len(self.iterated_gt) == len(self.iterated_poses)
+        assert len(self.iterated_gt) == len(self.stamps)
+
+        error_t = 0.0
+        error_r = 0.0
+        for gt, pose in zip(self.iterated_gt, self.iterated_poses):
+            error_t += float(np.linalg.norm(gt.trans - pose.trans))
+            error_r += float(np.linalg.norm((gt.rot * pose.rot.inverse()).log()))
+
+        error_t /= len(self.iterated_gt)
+        error_r /= len(self.iterated_gt)
+
+        return Ate(rot=error_r, trans=error_t)
 
     def ate(self) -> Ate:
         """
@@ -148,15 +178,28 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
         traj = load(file_path)
         experiments.append(traj)
 
-    header = ["ATEt", "ATEr", "features", "init", "dewarp", "edge", "planar"]
+    header = [
+        "AEt",
+        "AEr",
+        "ATEt",
+        "ATEr",
+        "features",
+        "init",
+        "dewarp",
+        "edge",
+        "planar",
+    ]
 
     results = []
     for exp in experiments:
         ate = exp.ate()
+        ate_iter = exp.iterated_ate()
         results.append(
             [
                 ate.trans,
                 ate.rot,
+                ate_iter.trans,
+                ate_iter.rot,
                 exp.params.features,
                 exp.params.init,
                 exp.params.dewarp,
