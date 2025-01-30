@@ -12,7 +12,7 @@ from wrappers import GroundTruthIterator, Rerun, Writer
 
 from multiprocessing import current_process
 
-from typing import Optional
+from typing import Optional, Sequence
 
 
 def run(
@@ -53,7 +53,7 @@ def run(
     pbar_params = {"total": len(data_iter), "dynamic_ncols": True}  # type: ignore
     if length is not None:
         pbar_params["total"] = length
-    pbar_desc = f"[{ep.short_info()}] Ed: {{}}, Pl: {{}}, Po: {{}}"
+    pbar_desc = f"[{ep.short_info()}] Po: {{}}, Ed: {{}}, Pl: {{}}"
     if multithreaded:
         idx = current_process()._identity[0] - 1
         pbar_params["position"] = idx
@@ -65,14 +65,7 @@ def run(
         if not isinstance(mm, LidarMeasurement):
             continue
 
-        # Get points in row major format if it's in column major
         pts = mm.to_vec_positions()
-        if mm.points[0].row != mm.points[1].row:
-            pts = np.asarray(pts)
-            pts = np.concatenate(
-                [pts[i :: lp.scan_lines] for i in range(lp.scan_lines)]
-            )
-            pts = list(pts)
 
         # Get features and ground truth
         curr_gt = gt.next(mm.stamp)
@@ -138,9 +131,9 @@ def run(
 
         pbar.set_description(
             pbar_desc.format(
+                len(curr_feat.point_points),
                 len(curr_feat.edge_points),
                 len(curr_feat.planar_points),
-                len(curr_feat.point_points),
             )
         )
         pbar.update()
@@ -156,6 +149,27 @@ def run(
     writer.close()
 
 
+def run_multithreaded(
+    eps: Sequence[params.ExperimentParams],
+    directory: Path,
+    visualize: bool = False,
+    length: Optional[int] = None,
+    ip: str = "0.0.0.0:9876",
+):
+    with Pool(10, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
+        p.map(
+            partial(
+                run,
+                directory=directory,
+                multithreaded=True,
+                length=length,
+                visualize=visualize,
+                ip=ip,
+            ),
+            eps,
+        )
+
+
 if __name__ == "__main__":
     from multiprocessing import Pool
     from functools import partial
@@ -164,33 +178,34 @@ if __name__ == "__main__":
         params.ExperimentParams(
             name="pseudo_planar",
             dataset="newer_college_2020/01_short_experiment",
-            init=params.Initialization.Identity,
-            features=[params.Feature.Pseudo_Planar],
-        ),
-        params.ExperimentParams(
-            name="planar",
-            dataset="newer_college_2020/01_short_experiment",
+            # dataset="newer_college_2021/quad-easy",
+            # dataset="oxford_spires/blenheim_palace_02",
             init=params.Initialization.Identity,
             features=[params.Feature.Planar],
         ),
         params.ExperimentParams(
-            name="planar_edge",
-            dataset="newer_college_2020/01_short_experiment",
+            name="pseudo_planar",
+            # dataset="newer_college_2020/01_short_experiment",
+            dataset="newer_college_2021/quad-easy",
+            # dataset="oxford_spires/blenheim_palace_02",
             init=params.Initialization.Identity,
-            features=[params.Feature.Planar, params.Feature.Edge],
+            features=[params.Feature.Planar],
         ),
+        # params.ExperimentParams(
+        #     name="planar",
+        #     dataset="newer_college_2020/01_short_experiment",
+        #     init=params.Initialization.Identity,
+        #     features=[params.Feature.Planar],
+        # ),
+        # params.ExperimentParams(
+        #     name="planar_edge",
+        #     dataset="newer_college_2020/01_short_experiment",
+        #     init=params.Initialization.Identity,
+        #     features=[params.Feature.Planar, params.Feature.Edge],
+        # ),
     ]
 
-    directory = Path("results/psuedo_planar_2.0")
+    directory = Path("results/25.01.30_random_testing")
     length = 1000
 
-    with Pool(10, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
-        p.map(
-            partial(
-                run,
-                directory=directory,
-                multithreaded=True,
-                length=length,
-            ),
-            eps,
-        )
+    run_multithreaded(eps, directory, length=length)

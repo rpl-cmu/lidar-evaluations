@@ -220,10 +220,14 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
 
     if sort is None:
         pass
-    elif sort.lower() == "atet":
+    elif sort.lower() == "aet":
         results = sorted(results, key=lambda x: x[0])
-    elif sort.lower() == "ater":
+    elif sort.lower() == "aer":
         results = sorted(results, key=lambda x: x[1])
+    elif sort.lower() == "atet":
+        results = sorted(results, key=lambda x: x[2])
+    elif sort.lower() == "ater":
+        results = sorted(results, key=lambda x: x[3])
 
     print(tabulate(results, headers=header, tablefmt="fancy"))
 
