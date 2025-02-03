@@ -9,9 +9,11 @@ from params import ExperimentParams, Feature
 import csv
 import numpy as np
 
-from typing import Optional
+from typing import Optional, cast
 
 from tabulate import tabulate
+
+from wrappers import Rerun
 
 
 @dataclass(kw_only=True)
@@ -218,6 +220,17 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
             ]
         )
 
+        if visualize:
+            # TODO: For some reason we're loosing some of the gt plots.. can't trace down why
+            rr = Rerun(exp.params.dataset)
+            rr.log(
+                exp.params.name,
+                exp.iterated_poses,
+                color=cast(list[int], np.random.randint(0, 255, 3).tolist()),
+                static=True,
+            )
+            rr.log("gt", exp.iterated_gt, color=[255, 0, 0], static=True)
+
     if sort is None:
         pass
     elif sort.lower() == "aet":
@@ -255,7 +268,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("directories", nargs="+", type=Path)
-    parser.add_argument("--visualize", action="store_true")
+    parser.add_argument("-v", "--visualize", action="store_true")
     parser.add_argument("-s", "--sort", type=str)
     args = parser.parse_args()
 

@@ -1,7 +1,7 @@
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 import loam
 import numpy as np
@@ -25,10 +25,16 @@ class GroundTruthIterator:
         elif self.idx > len(self.traj):
             return None
 
-        while self.traj.stamps[self.idx] - stamp < -tol:
+        while (
+            self.idx < len(self.traj.stamps)
+            and self.traj.stamps[self.idx] - stamp < -tol
+        ):
             self.idx += 1
 
-        return self.traj.poses[self.idx]
+        if self.idx >= len(self.traj):
+            return None
+        else:
+            return self.traj.poses[self.idx]
 
 
 class Writer:
@@ -105,8 +111,13 @@ class Rerun:
     def log(
         self,
         name: str,
-        value: loam.LoamFeatures | SE3 | LidarMeasurement | list,
+        value: loam.LoamFeatures
+        | SE3
+        | LidarMeasurement
+        | list[SE3]
+        | list[np.ndarray],
         color: list[int] = [0, 0, 255],
+        **kwargs,
     ):
         if isinstance(value, loam.LoamFeatures):
             rr.log(f"{name}/edges", rr.Points3D(value.edge_points, colors=[150, 0, 0]))
@@ -149,5 +160,11 @@ class Rerun:
                 rr.Points3D(value.to_vec_positions(), colors=color),
             )
 
-        elif isinstance(value, list):
-            rr.log(name, rr.Points3D(value, colors=color))
+        elif isinstance(value, list) and isinstance(value[0], SE3):
+            value = cast(list[SE3], value)
+            pts = np.array([p.trans for p in value])
+            rr.log(name, rr.Points3D(pts, colors=color), **kwargs)
+
+        elif isinstance(value, list) and isinstance(value[0], np.ndarray):
+            value = cast(list[np.ndarray], value)
+            rr.log(name, rr.Points3D(value, colors=color), **kwargs)

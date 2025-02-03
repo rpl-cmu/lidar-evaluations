@@ -46,10 +46,13 @@ class ExperimentParams:
     dewarp: Dewarping = Dewarping.Identity
 
     def __post_init__(self):
+        # Make sure features are valid
         assert len(self.features) > 0, "At least one feature must be selected"
         assert not (self.planar and self.pseudo_planar), (
             "Cannot have both planar and pseudo-planar features"
         )
+        # Make sure dataset is valid
+        DatasetBuilder.parse(self.dataset)
 
     @property
     def point(self) -> bool:

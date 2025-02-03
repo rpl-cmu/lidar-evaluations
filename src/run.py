@@ -10,7 +10,8 @@ import params
 from convert import convert
 from wrappers import GroundTruthIterator, Rerun, Writer
 
-from multiprocessing import current_process
+from multiprocessing import current_process, Pool
+from functools import partial
 
 from typing import Optional, Sequence
 
@@ -50,7 +51,7 @@ def run(
     iter_est = SE3.identity()
 
     data_iter = iter(dataset)
-    pbar_params = {"total": len(data_iter), "dynamic_ncols": True}  # type: ignore
+    pbar_params = {"total": len(data_iter), "dynamic_ncols": True, "leave": True}  # type: ignore
     if length is not None:
         pbar_params["total"] = length
     pbar_desc = f"[{ep.short_info()}] Po: {{}}, Ed: {{}}, Pl: {{}}"
@@ -155,8 +156,10 @@ def run_multithreaded(
     visualize: bool = False,
     length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
+    num_threads: int = 10,
 ):
-    with Pool(10, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
+    print(f"Running {len(eps)} experiments")
+    with Pool(num_threads, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
         p.map(
             partial(
                 run,
@@ -171,41 +174,42 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    from multiprocessing import Pool
-    from functools import partial
+    # dataset = "newer_college_2020/01_short_experiment"
+    # dataset = "hilti_2022/construction_upper_level_1"
+    # dataset = "helipr/kaist_04"
+    # dataset = "helipr/kaist_05"
+    # dataset = "oxford_spires/christ_church_01"
+    dataset = "helipr/dcc_06"
 
     eps = [
-        params.ExperimentParams(
-            name="pseudo_planar",
-            dataset="newer_college_2020/01_short_experiment",
-            # dataset="newer_college_2021/quad-easy",
-            # dataset="oxford_spires/blenheim_palace_02",
-            init=params.Initialization.Identity,
-            features=[params.Feature.Planar],
-        ),
-        params.ExperimentParams(
-            name="pseudo_planar",
-            # dataset="newer_college_2020/01_short_experiment",
-            dataset="newer_college_2021/quad-easy",
-            # dataset="oxford_spires/blenheim_palace_02",
-            init=params.Initialization.Identity,
-            features=[params.Feature.Planar],
-        ),
         # params.ExperimentParams(
         #     name="planar",
-        #     dataset="newer_college_2020/01_short_experiment",
+        #     dataset=dataset,
+        #     init=params.Initialization.Identity,
+        #     features=[params.Feature.Planar],
+        # ),
+        params.ExperimentParams(
+            name="planar_edge",
+            dataset=dataset,
+            init=params.Initialization.GroundTruth,
+            features=[params.Feature.Planar, params.Feature.Edge],
+        ),
+        # params.ExperimentParams(
+        #     name="pseudo_planar",
+        #     dataset=dataset,
         #     init=params.Initialization.Identity,
         #     features=[params.Feature.Planar],
         # ),
         # params.ExperimentParams(
-        #     name="planar_edge",
-        #     dataset="newer_college_2020/01_short_experiment",
+        #     name="pseudo_planar_edge",
+        #     dataset=dataset,
         #     init=params.Initialization.Identity,
-        #     features=[params.Feature.Planar, params.Feature.Edge],
+        #     features=[params.Feature.Planar],
         # ),
     ]
 
-    directory = Path("results/25.01.30_random_testing")
-    length = 1000
+    directory = Path("results/25.02.03_verify_datasets")
+    length = None
 
-    run_multithreaded(eps, directory, length=length)
+    run(eps[0], directory, visualize=False, length=length)
+    # run_multithreaded(eps, directory, length=length)
