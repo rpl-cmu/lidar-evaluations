@@ -55,6 +55,7 @@ class ExperimentParams:
     curvature: Curvature = Curvature.Loam
     curvature_planar_threshold: float = 1.0
     # registration
+    pseudo_planar_epsilon: float = 0.1
     init: Initialization = Initialization.GroundTruth
     dewarp: Dewarping = Dewarping.Identity
 
@@ -104,7 +105,7 @@ class ExperimentParams:
         reg_params = loam.RegistrationParams()
         reg_params.max_iterations = 20
         # TODO: This could probably use some tuning!
-        reg_params.pseudo_plane_normal_epsilon = 0.1
+        reg_params.pseudo_plane_normal_epsilon = self.pseudo_planar_epsilon
 
         if self.pseudo_planar:
             reg_params.planar_version = loam.PlanarVersion.PSEUDO_PLANAR

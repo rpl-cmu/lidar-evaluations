@@ -7,6 +7,7 @@ from typing import Optional, cast
 import numpy as np
 from serde.yaml import from_yaml
 from tabulate import tabulate
+import polars as pl
 
 from evalio.types import SE3, SO3, Stamp
 from params import ExperimentParams, Feature
@@ -14,13 +15,34 @@ from wrappers import Rerun
 
 
 @dataclass(kw_only=True)
-class Ate:
+class Metric:
     trans: float
     rot: float
 
 
 @dataclass(kw_only=True)
-class Experiment:
+class Error:
+    trans: np.ndarray
+    rot: np.ndarray
+
+    def mean(self) -> Metric:
+        return Metric(rot=self.rot.mean(), trans=self.trans.mean())
+
+    def sse(self) -> Metric:
+        return Metric(
+            rot=float(np.sqrt(self.rot @ self.rot)),
+            trans=float(np.sqrt(self.trans @ self.trans)),
+        )
+
+    def median(self) -> Metric:
+        return Metric(
+            rot=cast(float, np.median(self.rot)),
+            trans=cast(float, np.median(self.trans)),
+        )
+
+
+@dataclass(kw_only=True)
+class ExperimentResult:
     params: ExperimentParams
     stamps: list[Stamp]
     poses: list[SE3]
@@ -51,154 +73,150 @@ class Experiment:
             iterated_poses.append(iterated_poses[-1] * self.poses[i])
         return iterated_poses
 
-    def iterated_ate(self) -> Ate:
-        assert len(self.iterated_gt) == len(self.iterated_poses)
-        assert len(self.iterated_gt) == len(self.stamps)
+    @staticmethod
+    def _compute_metric(gts: list[SE3], poses: list[SE3]) -> Error:
+        assert len(gts) == len(poses)
 
-        error_t = 0.0
-        error_r = 0.0
-        for gt, pose in zip(self.iterated_gt, self.iterated_poses):
-            error_t += float(np.linalg.norm(gt.trans - pose.trans))
-            error_r += float(np.linalg.norm((gt.rot * pose.rot.inverse()).log()))
+        error_t = np.zeros(len(gts))
+        error_r = np.zeros(len(gts))
+        for i, (gt, pose) in enumerate(zip(gts, poses)):
+            delta = gt.inverse() * pose
+            error_t[i] = np.sqrt(delta.trans @ delta.trans)
+            r_diff = delta.rot.log()
+            error_r[i] = np.sqrt(r_diff @ r_diff)
 
-        error_t /= len(self.iterated_gt)
-        error_r /= len(self.iterated_gt)
+        return Error(rot=error_r, trans=error_t)
 
-        return Ate(rot=error_r, trans=error_t)
+    def ate(self) -> Error:
+        return self._compute_metric(self.iterated_gt, self.iterated_poses)
 
-    def ate(self) -> Ate:
-        """
-        Computes the Absolute Trajectory Error
-        """
-        assert len(self.gt) == len(self.poses)
-        assert len(self.gt) == len(self.stamps)
-
-        error_t = 0.0
-        error_r = 0.0
-        for gt, pose in zip(self.gt, self.poses):
-            error_t += float(np.linalg.norm(gt.trans - pose.trans))
-            error_r += float(np.linalg.norm((gt.rot * pose.rot.inverse()).log()))
-
-        error_t /= len(self.gt)
-        error_r /= len(self.gt)
-
-        return Ate(rot=error_r, trans=error_t)
+    def rte(self) -> Error:
+        return self._compute_metric(self.gt, self.poses)
 
     def get_feature(self, feature: Feature) -> np.ndarray:
         return self.features[feature]
 
+    @staticmethod
+    def load(path: Path) -> "ExperimentResult":
+        fieldnames = [
+            "sec",
+            "x",
+            "y",
+            "z",
+            "qx",
+            "qy",
+            "qz",
+            "qw",
+            "gt_x",
+            "gt_y",
+            "gt_z",
+            "gt_qx",
+            "gt_qy",
+            "gt_qz",
+            "gt_qw",
+            "point",
+            "edge",
+            "planar",
+        ]
 
-def load(path: Path) -> Experiment:
-    fieldnames = [
-        "sec",
-        "x",
-        "y",
-        "z",
-        "qx",
-        "qy",
-        "qz",
-        "qw",
-        "gt_x",
-        "gt_y",
-        "gt_z",
-        "gt_qx",
-        "gt_qy",
-        "gt_qz",
-        "gt_qw",
-        "point",
-        "edge",
-        "planar",
-    ]
+        poses = []
+        gts = []
+        stamps = []
+        points = []
+        edges = []
+        planars = []
 
-    poses = []
-    gts = []
-    stamps = []
-    points = []
-    edges = []
-    planars = []
+        with open(path) as file:
+            metadata_filter = filter(lambda row: row[0] == "#", file)
+            metadata_list = [row[1:].strip() for row in metadata_filter]
+            metadata_list.pop(-1)
+            metadata_str = "\n".join(metadata_list)
+            # remove the header row
+            params = from_yaml(ExperimentParams, metadata_str)
 
-    with open(path) as file:
-        metadata_filter = filter(lambda row: row[0] == "#", file)
-        metadata_list = [row[1:].strip() for row in metadata_filter]
-        metadata_list.pop(-1)
-        metadata_str = "\n".join(metadata_list)
-        # remove the header row
-        params = from_yaml(ExperimentParams, metadata_str)
+            # Load trajectory
+            file.seek(0)
+            csvfile = filter(lambda row: row[0] != "#", file)
+            reader = csv.DictReader(csvfile, fieldnames=fieldnames)
+            for line in reader:
+                r = SO3(
+                    qw=float(line["qw"]),
+                    qx=float(line["qx"]),
+                    qy=float(line["qy"]),
+                    qz=float(line["qz"]),
+                )
+                t = np.array([float(line["x"]), float(line["y"]), float(line["z"])])
+                pose = SE3(r, t)
 
-        # Load trajectory
-        file.seek(0)
-        csvfile = filter(lambda row: row[0] != "#", file)
-        reader = csv.DictReader(csvfile, fieldnames=fieldnames)
-        for line in reader:
-            r = SO3(
-                qw=float(line["qw"]),
-                qx=float(line["qx"]),
-                qy=float(line["qy"]),
-                qz=float(line["qz"]),
-            )
-            t = np.array([float(line["x"]), float(line["y"]), float(line["z"])])
-            pose = SE3(r, t)
+                gt_r = SO3(
+                    qw=float(line["gt_qw"]),
+                    qx=float(line["gt_qx"]),
+                    qy=float(line["gt_qy"]),
+                    qz=float(line["gt_qz"]),
+                )
+                gt_t = np.array(
+                    [float(line["gt_x"]), float(line["gt_y"]), float(line["gt_z"])]
+                )
+                gt = SE3(gt_r, gt_t)
 
-            gt_r = SO3(
-                qw=float(line["gt_qw"]),
-                qx=float(line["gt_qx"]),
-                qy=float(line["gt_qy"]),
-                qz=float(line["gt_qz"]),
-            )
-            gt_t = np.array(
-                [float(line["gt_x"]), float(line["gt_y"]), float(line["gt_z"])]
-            )
-            gt = SE3(gt_r, gt_t)
+                if "nsec" not in fieldnames:
+                    stamp = Stamp.from_sec(float(line["sec"]))
+                elif "sec" not in fieldnames:
+                    stamp = Stamp.from_nsec(int(line["nsec"]))
+                else:
+                    stamp = Stamp(sec=int(line["sec"]), nsec=int(line["nsec"]))
 
-            if "nsec" not in fieldnames:
-                stamp = Stamp.from_sec(float(line["sec"]))
-            elif "sec" not in fieldnames:
-                stamp = Stamp.from_nsec(int(line["nsec"]))
-            else:
-                stamp = Stamp(sec=int(line["sec"]), nsec=int(line["nsec"]))
+                points.append(int(line["point"]))
+                edges.append(int(line["edge"]))
+                planars.append(int(line["planar"]))
 
-            points.append(int(line["point"]))
-            edges.append(int(line["edge"]))
-            planars.append(int(line["planar"]))
+                poses.append(pose)
+                gts.append(gt)
+                stamps.append(stamp)
 
-            poses.append(pose)
-            gts.append(gt)
-            stamps.append(stamp)
-
-    return Experiment(
-        params=params,
-        stamps=stamps,
-        poses=poses,
-        gt=gts,
-        features={
-            Feature.Point: np.asarray(points),
-            Feature.Edge: np.asarray(edges),
-            Feature.Planar: np.asarray(planars),
-        },
-    )
+        return ExperimentResult(
+            params=params,
+            stamps=stamps,
+            poses=poses,
+            gt=gts,
+            features={
+                Feature.Point: np.asarray(points),
+                Feature.Edge: np.asarray(edges),
+                Feature.Planar: np.asarray(planars),
+            },
+        )
 
 
-def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
+def eval_dataset(
+    dir: Path,
+    visualize: bool = False,
+    sort: Optional[str] = None,
+    print_results: bool = True,
+):
     # Load all experiments
-    experiments = []
-    for file_path in dir.glob("*.csv"):
-        traj = load(file_path)
-        experiments.append(traj)
+    experiments: list[ExperimentResult] = []
+    if not dir.is_dir():
+        experiments.append(ExperimentResult.load(dir))
+    else:
+        for file_path in dir.glob("*.csv"):
+            traj = ExperimentResult.load(file_path)
+            experiments.append(traj)
 
     results = []
     for exp in experiments:
-        ate = exp.ate()
-        ate_iter = exp.iterated_ate()
+        rte = exp.rte().mean()
+        ate = exp.ate().mean()
         r = asdict(exp.params)
         r.update(
             {
-                "AEt": ate.trans,
-                "AEr": ate.rot,
-                "ATEt": ate_iter.trans,
-                "ATEr": ate_iter.rot,
+                "RTEt": rte.trans,
+                "RTEr": rte.rot,
+                "ATEt": ate.trans,
+                "ATEr": ate.rot,
                 "point": exp.get_feature(Feature.Point).mean(),
                 "edge": exp.get_feature(Feature.Edge).mean(),
                 "planar": exp.get_feature(Feature.Planar).mean(),
+                "length": len(exp),
             }
         )
         results.append(r)
@@ -214,17 +232,21 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
             )
             rr.log("gt", exp.iterated_gt, color=[255, 0, 0], static=True)
 
-    # Remove any columns that are constant
-    all_keys = list(results[0].keys())
-    for key in all_keys:
-        if all(x[key] == results[0][key] for x in results):
-            for item in results:
-                del item[key]
-
     if sort is not None:
         results = sorted(results, key=lambda x: x[sort])
 
-    print(tabulate(results, headers="keys", tablefmt="fancy"))
+    # Remove any columns that are constant if we're printing
+    all_keys = list(results[0].keys())
+    if print_results and len(results) > 1:
+        for key in all_keys:
+            if all(x[key] == results[0][key] for x in results):
+                for item in results:
+                    del item[key]
+
+    if print_results:
+        print(tabulate(results, headers="keys", tablefmt="fancy"))
+
+    return results
 
 
 def _contains_dir(directory: Path) -> bool:
@@ -232,9 +254,12 @@ def _contains_dir(directory: Path) -> bool:
 
 
 def eval(directories: list[Path], visualize: bool, sort: Optional[str] = None):
+    # TODO: Make this cache things as well
     # Collect all bottom level directories
     bottom_level_dirs = []
     for directory in directories:
+        if not directory.is_dir():
+            bottom_level_dirs.append(directory)
         for subdir in directory.glob("**/"):
             if not _contains_dir(subdir):
                 bottom_level_dirs.append(subdir)
@@ -245,9 +270,39 @@ def eval(directories: list[Path], visualize: bool, sort: Optional[str] = None):
         print()
 
 
+def compute_cache_stats(directory: Path) -> pl.DataFrame:
+    df_file = directory.parent / (directory.name + ".csv")
+
+    if not df_file.exists():
+        bottom_level_dirs = []
+        for subdir in directory.glob("**/"):
+            if not _contains_dir(subdir):
+                bottom_level_dirs.append(subdir)
+
+        all_data = []
+        for dataset in bottom_level_dirs:
+            print(dataset)
+            all_data += eval_dataset(dataset, print_results=False)
+
+        for d in all_data:
+            del d["features"]
+            d["curvature"] = d["curvature"].name
+            d["init"] = d["init"].name
+            d["dewarp"] = d["dewarp"].name
+
+        df = pl.DataFrame(all_data)
+        df.write_csv(df_file)
+    else:
+        df = pl.read_csv(df_file)
+
+    return df
+
+
 if __name__ == "__main__":
     import argparse
+    import time
 
+    start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("directories", nargs="+", type=Path)
     parser.add_argument("-v", "--visualize", action="store_true")
@@ -255,3 +310,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     eval(args.directories, args.visualize, args.sort)
+    print(f"Elapsed time: {time.time() - start:.2f}s")

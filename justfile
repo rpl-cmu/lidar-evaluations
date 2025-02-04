@@ -13,7 +13,7 @@ stubs:
     pybind11-stubgen --numpy-array-wrap-with-annotated loam -o loam/python/
 
 compdb:
-    compdb -p loam/build/cp311-cp311-linux_x86_64/ -p evalio/build/cp311-cp311-linux_x86_64/ list > compile_commands.json
+    compdb -p loam/build/cp312-cp312-linux_x86_64/ -p evalio/build/cp312-cp312-linux_x86_64/ list > compile_commands.json
 
 args:
     eval "$(register-python-argcomplete evalio)"
