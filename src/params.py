@@ -1,6 +1,7 @@
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+
+from serde import serde
 
 import loam
 from evalio.cli.parser import DatasetBuilder
@@ -37,11 +38,23 @@ class Dewarping(PrettyPrintEnum):
     GroundTruth = 2
 
 
-@dataclass
+class Curvature(PrettyPrintEnum):
+    Loam = 0
+    Eigen = 1
+
+    def into(self) -> loam.Curvature:
+        return loam.Curvature(self.value)
+
+
+@serde
 class ExperimentParams:
     name: str
     dataset: str
+    # features
     features: list[Feature]
+    curvature: Curvature = Curvature.Loam
+    curvature_planar_threshold: float = 1.0
+    # registration
     init: Initialization = Initialization.GroundTruth
     dewarp: Dewarping = Dewarping.Identity
 
@@ -79,7 +92,8 @@ class ExperimentParams:
         feat_params.max_point_feats_per_sector = 50
 
         feat_params.edge_feat_threshold = 50.0
-        feat_params.planar_feat_threshold = 1.0
+        feat_params.curvature_type = self.curvature.into()
+        feat_params.planar_feat_threshold = self.curvature_planar_threshold
 
         feat_params.occlusion_thresh = 0.9
         feat_params.parallel_thresh = 0.01
@@ -109,8 +123,5 @@ class ExperimentParams:
     def short_info(self) -> str:
         ds, seq = self.dataset.split("/")
         ds = ds[:3] + ds[-2:] + "/" + seq[:2]
-        f = "/".join(f.name[:2] for f in self.features)
-        i = uppers(self.init.name)
-        d = uppers(self.dewarp.name)
 
-        return f"ds: {ds}, feat: {f}, init: {i}, dew: {d}"
+        return f"ds: {ds}, {self.name}"

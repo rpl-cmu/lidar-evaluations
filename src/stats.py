@@ -1,18 +1,15 @@
-from dataclasses import dataclass
-from pathlib import Path
-from evalio.types import SE3, SO3, Stamp
-
-from functools import cached_property
-from serde.yaml import from_yaml
-
-from params import ExperimentParams, Feature
 import csv
-import numpy as np
-
+from dataclasses import asdict, dataclass
+from functools import cached_property
+from pathlib import Path
 from typing import Optional, cast
 
+import numpy as np
+from serde.yaml import from_yaml
 from tabulate import tabulate
 
+from evalio.types import SE3, SO3, Stamp
+from params import ExperimentParams, Feature
 from wrappers import Rerun
 
 
@@ -188,37 +185,23 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
         traj = load(file_path)
         experiments.append(traj)
 
-    header = [
-        "AEt",
-        "AEr",
-        "ATEt",
-        "ATEr",
-        "features",
-        "init",
-        "dewarp",
-        "point",
-        "edge",
-        "planar",
-    ]
-
     results = []
     for exp in experiments:
         ate = exp.ate()
         ate_iter = exp.iterated_ate()
-        results.append(
-            [
-                ate.trans,
-                ate.rot,
-                ate_iter.trans,
-                ate_iter.rot,
-                exp.params.features,
-                exp.params.init,
-                exp.params.dewarp,
-                exp.get_feature(Feature.Point).mean(),
-                exp.get_feature(Feature.Edge).mean(),
-                exp.get_feature(Feature.Planar).mean(),
-            ]
+        r = asdict(exp.params)
+        r.update(
+            {
+                "AEt": ate.trans,
+                "AEr": ate.rot,
+                "ATEt": ate_iter.trans,
+                "ATEr": ate_iter.rot,
+                "point": exp.get_feature(Feature.Point).mean(),
+                "edge": exp.get_feature(Feature.Edge).mean(),
+                "planar": exp.get_feature(Feature.Planar).mean(),
+            }
         )
+        results.append(r)
 
         if visualize:
             # TODO: For some reason we're loosing some of the gt plots.. can't trace down why
@@ -231,18 +214,17 @@ def eval_dataset(dir: Path, visualize: bool, sort: Optional[str]):
             )
             rr.log("gt", exp.iterated_gt, color=[255, 0, 0], static=True)
 
-    if sort is None:
-        pass
-    elif sort.lower() == "aet":
-        results = sorted(results, key=lambda x: x[0])
-    elif sort.lower() == "aer":
-        results = sorted(results, key=lambda x: x[1])
-    elif sort.lower() == "atet":
-        results = sorted(results, key=lambda x: x[2])
-    elif sort.lower() == "ater":
-        results = sorted(results, key=lambda x: x[3])
+    # Remove any columns that are constant
+    all_keys = list(results[0].keys())
+    for key in all_keys:
+        if all(x[key] == results[0][key] for x in results):
+            for item in results:
+                del item[key]
 
-    print(tabulate(results, headers=header, tablefmt="fancy"))
+    if sort is not None:
+        results = sorted(results, key=lambda x: x[sort])
+
+    print(tabulate(results, headers="keys", tablefmt="fancy"))
 
 
 def _contains_dir(directory: Path) -> bool:

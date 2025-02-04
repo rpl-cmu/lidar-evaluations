@@ -3,13 +3,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, cast
 
-import loam
 import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
-from evalio.types import SE3, LidarMeasurement, Stamp, Trajectory
 from serde.yaml import to_yaml
 
+import loam
+from evalio.types import SE3, LidarMeasurement, Stamp, Trajectory
 from params import ExperimentParams
 
 
@@ -105,8 +105,11 @@ class Rerun:
         self.colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
         self.history: dict[str, tuple[list, list]] = {}
 
-    def stamp(self, stamp: Stamp):
-        rr.set_time_seconds("time", seconds=stamp.to_sec())
+    def stamp(self, stamp: Stamp | float):
+        if isinstance(stamp, float):
+            rr.set_time_seconds("time", seconds=stamp)
+        elif isinstance(stamp, Stamp):
+            rr.set_time_seconds("time", seconds=stamp.to_sec())
 
     def log(
         self,

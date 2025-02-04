@@ -1,29 +1,46 @@
+from functools import partial
+from multiprocessing import Manager, Pool
 from pathlib import Path
+from time import sleep
+from typing import Optional, Sequence
 
-import loam
 import numpy as np
-from evalio.types import SE3, SO3, LidarMeasurement
-from loam import Pose3d
 from tqdm import tqdm
 
+import loam
 import params
 from convert import convert
+from evalio.types import SE3, SO3, LidarMeasurement
+from loam import Pose3d
 from wrappers import GroundTruthIterator, Rerun, Writer
 
-from multiprocessing import current_process, Pool
-from functools import partial
 
-from typing import Optional, Sequence
+def get_pgb_pos(shared_list) -> int:
+    # Acquire lock and get a progress bar slot
+    for i in range(len(shared_list)):
+        if not shared_list[i]:
+            shared_list[i] = True
+            return i
+
+    raise ValueError("No available progress bar slots")
+
+
+def release_pgb_pos(shared_list, slot):
+    shared_list[slot] = 0
 
 
 def run(
     ep: params.ExperimentParams,
     directory: Path,
-    multithreaded: bool = False,
+    multithreaded_info: Optional[list] = None,
     visualize: bool = False,
     length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
 ):
+    # Sleep for a small blip to offset the progress bars
+    if multithreaded_info is not None:
+        sleep(np.random.rand())
+
     # Load the data
     dataset = ep.build_dataset()
     # Load ground truth in lidar frame
@@ -51,14 +68,18 @@ def run(
     iter_est = SE3.identity()
 
     data_iter = iter(dataset)
-    pbar_params = {"total": len(data_iter), "dynamic_ncols": True, "leave": True}  # type: ignore
+    pbar_params = {
+        "total": len(data_iter),  # type: ignore
+        "dynamic_ncols": True,
+        "leave": False,
+        "desc": f"[{ep.short_info()}]",
+    }
     if length is not None:
         pbar_params["total"] = length
-    pbar_desc = f"[{ep.short_info()}] Po: {{}}, Ed: {{}}, Pl: {{}}"
-    if multithreaded:
-        idx = current_process()._identity[0] - 1
-        pbar_params["position"] = idx
-        pbar_desc = f"{idx}, " + pbar_desc
+    pbar_idx = None
+    if multithreaded_info is not None:
+        pbar_idx = get_pgb_pos(multithreaded_info)
+        pbar_params["position"] = pbar_idx + 1
     pbar = tqdm(**pbar_params)
     idx = 0
 
@@ -130,13 +151,6 @@ def run(
                 np.array([np.nan, np.nan, np.nan]),
             )
 
-        pbar.set_description(
-            pbar_desc.format(
-                len(curr_feat.point_points),
-                len(curr_feat.edge_points),
-                len(curr_feat.planar_points),
-            )
-        )
         pbar.update()
 
         prev_prev_gt = prev_gt
@@ -147,6 +161,9 @@ def run(
             break
         idx += 1
 
+    pbar.close()
+    if multithreaded_info is not None and pbar_idx is not None:
+        release_pgb_pos(multithreaded_info, pbar_idx)
     writer.close()
 
 
@@ -158,54 +175,44 @@ def run_multithreaded(
     ip: str = "0.0.0.0:9876",
     num_threads: int = 10,
 ):
-    print(f"Running {len(eps)} experiments")
-    with Pool(num_threads, initargs=(tqdm.get_lock(),), initializer=tqdm.set_lock) as p:
-        p.map(
-            partial(
-                run,
-                directory=directory,
-                multithreaded=True,
-                length=length,
-                visualize=visualize,
-                ip=ip,
+    # https://github.com/tqdm/tqdm/issues/1000#issuecomment-1842085328
+    # tqdm still isn't perfect - can be a bit janky if resizing
+    # but I'm fairly satisfied with it now
+    manager = Manager()
+    shared_list = manager.list([False for _ in range(num_threads)])
+    lock = manager.Lock()
+
+    with Pool(num_threads, initargs=(lock,), initializer=tqdm.set_lock) as p:
+        for _ in tqdm(
+            p.imap_unordered(
+                partial(
+                    run,
+                    directory=directory,
+                    multithreaded_info=shared_list,  # type:ignore
+                    length=length,
+                    visualize=visualize,
+                    ip=ip,
+                ),
+                eps,
             ),
-            eps,
-        )
+            total=len(eps),
+            position=0,
+            desc="Running experiments",
+            leave=True,
+        ):
+            pass
 
 
 if __name__ == "__main__":
-    # dataset = "newer_college_2020/01_short_experiment"
-    # dataset = "hilti_2022/construction_upper_level_1"
-    # dataset = "helipr/kaist_04"
-    # dataset = "helipr/kaist_05"
-    # dataset = "oxford_spires/christ_church_01"
     dataset = "helipr/dcc_06"
 
     eps = [
-        # params.ExperimentParams(
-        #     name="planar",
-        #     dataset=dataset,
-        #     init=params.Initialization.Identity,
-        #     features=[params.Feature.Planar],
-        # ),
         params.ExperimentParams(
             name="planar_edge",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             features=[params.Feature.Planar, params.Feature.Edge],
         ),
-        # params.ExperimentParams(
-        #     name="pseudo_planar",
-        #     dataset=dataset,
-        #     init=params.Initialization.Identity,
-        #     features=[params.Feature.Planar],
-        # ),
-        # params.ExperimentParams(
-        #     name="pseudo_planar_edge",
-        #     dataset=dataset,
-        #     init=params.Initialization.Identity,
-        #     features=[params.Feature.Planar],
-        # ),
     ]
 
     directory = Path("results/25.02.03_verify_datasets")
