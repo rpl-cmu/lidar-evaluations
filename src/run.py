@@ -88,9 +88,48 @@ def run(
             continue
 
         pts = mm.to_vec_positions()
+        pts_stamps = mm.to_vec_stamps()
+
+        # Get ground truth and skip if we don't have all of them
+        curr_gt = gt.next(mm.stamp)
+        if curr_gt is None:
+            continue
+        if prev_gt is None:
+            prev_gt = curr_gt
+            continue
+        if prev_prev_gt is None:
+            prev_prev_gt = prev_gt
+            prev_gt = curr_gt
+            continue
+
+        # Get initialization
+        step_gt = prev_gt.inverse() * curr_gt
+        match ep.init:
+            case params.Initialization.GroundTruth:
+                init = convert(step_gt)
+            case params.Initialization.ConstantVelocity:
+                init = convert(prev_prev_gt.inverse() * prev_gt)
+            case params.Initialization.Identity:
+                init = Pose3d.Identity()
+            case _:
+                raise ValueError("Unknown initialization")
+
+        # Deskew
+        match ep.dewarp:
+            case params.Dewarp.Identity:
+                pass
+            case params.Dewarp.ConstantVelocity:
+                pts = loam.deskewInterpolate(
+                    pts, pts_stamps, convert(prev_prev_gt), convert(prev_gt)
+                )
+            case params.Dewarp.GroundTruth:
+                pts = loam.deskewInterpolate(
+                    pts, pts_stamps, convert(prev_gt), convert(curr_gt)
+                )
+            case _:
+                raise ValueError("Unknown dewarping")
 
         # Get features and ground truth
-        curr_gt = gt.next(mm.stamp)
         curr_feat = loam.extractFeatures(pts, lp, fp)
         if not ep.planar and not ep.pseudo_planar:
             curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
@@ -102,27 +141,10 @@ def run(
             curr_feat.point_points = []
 
         # Skip if we don't have everything we need
-        if curr_gt is None:
-            continue
-        if prev_feat is None or prev_gt is None:
+        if prev_feat is None:
             prev_feat = curr_feat
             prev_gt = curr_gt
             continue
-
-        # Get initialization
-        step_gt = prev_gt.inverse() * curr_gt
-        match ep.init:
-            case params.Initialization.GroundTruth:
-                init = convert(step_gt)
-            case params.Initialization.ConstantVelocity:
-                if prev_prev_gt is None:
-                    init = Pose3d.Identity()
-                else:
-                    init = convert(prev_prev_gt.inverse() * prev_gt)
-            case params.Initialization.Identity:
-                init = Pose3d.Identity()
-            case _:
-                raise ValueError("Unknown initialization")
 
         try:
             step_pose = loam.registerFeatures(curr_feat, prev_feat, init, params=rp)
@@ -197,26 +219,28 @@ def run_multithreaded(
             ),
             total=len(eps),
             position=0,
-            desc="Running experiments",
+            desc="Experiments",
             leave=True,
+            dynamic_ncols=True,
         ):
             pass
 
 
 if __name__ == "__main__":
-    dataset = "helipr/dcc_06"
+    dataset = "hilti_2022/construction_upper_level_1"
 
     eps = [
         params.ExperimentParams(
-            name="planar_edge",
+            name="planar",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
-            features=[params.Feature.Planar, params.Feature.Edge],
+            dewarp=params.Dewarp.Identity,
+            features=[params.Feature.Planar],
         ),
     ]
 
-    directory = Path("results/25.02.03_verify_datasets")
+    directory = Path("results/25.02.04_verify_dewarp")
     length = None
 
-    run(eps[0], directory, visualize=False, length=length)
+    run(eps[0], directory, visualize=True, length=length)
     # run_multithreaded(eps, directory, length=length)

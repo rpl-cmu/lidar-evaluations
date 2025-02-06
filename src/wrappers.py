@@ -12,6 +12,20 @@ import loam
 from evalio.types import SE3, LidarMeasurement, Stamp, Trajectory
 from params import ExperimentParams
 
+import os
+import matplotlib.pyplot as plt
+
+
+def is_remote() -> bool:
+    return "" != os.environ.get("SSH_CLIENT", "")
+
+
+def plt_show(filename: str | Path):
+    if is_remote():
+        plt.savefig(filename)
+    else:
+        plt.show()
+
 
 @dataclass
 class GroundTruthIterator:

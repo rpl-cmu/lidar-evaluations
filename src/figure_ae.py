@@ -3,19 +3,23 @@ from stats import ExperimentResult
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from wrappers import plt_show
+
 files = [
-    "results/full_features/newer_college_2020/01_short_experiment/groundtruth_pseudo_planar_point.csv",
-    "results/full_features/newer_college_2020/01_short_experiment/constantvelocity_planar.csv",
+    "results/25.02.04_pseudo/newer_college_2020/01_short_experiment/pseudo_0.114.csv",
+    "results/25.02.04_pseudo/newer_college_2020/01_short_experiment/pseudo_0.948.csv",
 ]
 
 fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained")
 
 for f in files:
     exp = ExperimentResult.load(Path(f))
-    ae = exp.ae()
+    rte = exp.rte()
 
-    sns.histplot(ae.trans, ax=ax[0], label=exp.params.name)
-    sns.histplot(ae.rot, ax=ax[1])
+    sns.histplot(rte.rot, ax=ax[0], label=exp.params.name)
+    sns.histplot(rte.trans, ax=ax[1], label=exp.params.name)
 
 ax[0].legend()
-plt.show()
+ax[0].set_title("Rotation")
+ax[1].set_title("Translation")
+plt_show(Path("figures") / "pseudo_rte.png")

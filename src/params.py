@@ -32,7 +32,7 @@ class Initialization(PrettyPrintEnum):
     Identity = 2
 
 
-class Dewarping(PrettyPrintEnum):
+class Dewarp(PrettyPrintEnum):
     Identity = 0
     ConstantVelocity = 1
     GroundTruth = 2
@@ -57,7 +57,7 @@ class ExperimentParams:
     # registration
     pseudo_planar_epsilon: float = 0.1
     init: Initialization = Initialization.GroundTruth
-    dewarp: Dewarping = Dewarping.Identity
+    dewarp: Dewarp = Dewarp.Identity
 
     def __post_init__(self):
         # Make sure features are valid
@@ -122,7 +122,17 @@ class ExperimentParams:
         return directory / self.dataset / f"{self.name}.log"
 
     def short_info(self) -> str:
+        def short(f: str) -> str:
+            if f.isdigit():
+                return f[-2:]
+            else:
+                return f[:1]
+
         ds, seq = self.dataset.split("/")
-        ds = ds[:3] + ds[-2:] + "/" + seq[:2]
+        ds = (
+            "".join(short(d) for d in ds.split("_"))
+            + "/"
+            + "".join(short(d) for d in seq.split("_"))
+        )
 
         return f"ds: {ds}, {self.name}"

@@ -83,7 +83,7 @@ class ExperimentResult:
             delta = gt.inverse() * pose
             error_t[i] = np.sqrt(delta.trans @ delta.trans)
             r_diff = delta.rot.log()
-            error_r[i] = np.sqrt(r_diff @ r_diff)
+            error_r[i] = np.sqrt(r_diff @ r_diff) * 180 / np.pi
 
         return Error(rot=error_r, trans=error_t)
 
