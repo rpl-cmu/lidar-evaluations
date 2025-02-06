@@ -48,9 +48,7 @@ def run(
     gt.transform_in_place(dataset.imu_T_lidar())
     gt = GroundTruthIterator(gt)
 
-    # Create writer
-    writer = Writer(directory, ep)
-    writer.log(f"Starting experiment {ep.name}")
+    # Create visualizer
     rr = None
     if visualize:
         rr = Rerun(to_hide=["pose/points", "pose/features/*"], ip=ip)
@@ -60,14 +58,18 @@ def run(
     fp = ep.feature_params()
     rp = ep.registration_params()
 
-    prev_feat = None
-    prev_gt = None
-    prev_prev_gt = None
-
-    iter_gt = SE3.identity()
-    iter_est = SE3.identity()
-
+    # Check if this has been run to completion
     data_iter = iter(dataset)
+    if ep.output_file(directory).exists():
+        with open(ep.output_file(directory), "r") as f:
+            file = filter(lambda row: row[0] != "#", f)
+            num = len(list(file))
+        # We run for 4 lines short of the full dataset due to needing curr_gt, prev_gt, prev_prev_gt, etc
+        # We increase this to 10 just for good measure (likely to stop within 10 of the finish)
+        if (length is not None and num > length) or num >= len(data_iter) - 10:  # type:ignore
+            return
+
+    # Setup progress bar
     pbar_params = {
         "total": len(data_iter),  # type: ignore
         "dynamic_ncols": True,
@@ -81,7 +83,20 @@ def run(
         pbar_idx = get_pgb_pos(multithreaded_info)
         pbar_params["position"] = pbar_idx + 1
     pbar = tqdm(**pbar_params)
+
+    # Setup writer
+    writer = Writer(directory, ep)
+    writer.log(f"Starting experiment {ep.name}")
+
+    # Setup everything for running
     idx = 0
+
+    prev_feat = None
+    prev_gt = None
+    prev_prev_gt = None
+
+    iter_gt = SE3.identity()
+    iter_est = SE3.identity()
 
     for mm in data_iter:
         if not isinstance(mm, LidarMeasurement):
@@ -143,6 +158,7 @@ def run(
         # Skip if we don't have everything we need
         if prev_feat is None:
             prev_feat = curr_feat
+            prev_prev_gt = prev_gt
             prev_gt = curr_gt
             continue
 
@@ -159,6 +175,21 @@ def run(
                 rr.log("pose", iter_est)
                 rr.log("pose/points", mm)
                 rr.log("pose/features", curr_feat)
+
+                # compute metrics to send as well
+                delta = step_gt.inverse() * step_pose
+                error_t = np.sqrt(delta.trans @ delta.trans)
+                r_diff = delta.rot.log()
+                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+                rr.log("metrics/rte/rot", float(error_r))
+                rr.log("metrics/rte/trans", float(error_t))
+
+                delta = iter_gt.inverse() * iter_est
+                error_t = np.sqrt(delta.trans @ delta.trans)
+                r_diff = delta.rot.log()
+                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+                rr.log("metrics/ate/rot", float(error_r))
+                rr.log("metrics/ate/trans", float(error_t))
 
             # Save results
             # Saving deltas for now - maybe switch to trajectories later
@@ -227,19 +258,20 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "hilti_2022/construction_upper_level_1"
+    dataset = "newer_college_2020/01_short_experiment"
 
     eps = [
         params.ExperimentParams(
-            name="planar",
+            name="pseudo_0.948",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
-            features=[params.Feature.Planar],
+            pseudo_planar_epsilon=0.948,
+            features=[params.Feature.Pseudo_Planar],
         ),
     ]
 
-    directory = Path("results/25.02.04_verify_dewarp")
+    directory = Path("results/25.02.06_visualize_new20")
     length = None
 
     run(eps[0], directory, visualize=True, length=length)

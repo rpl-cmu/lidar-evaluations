@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 
 def is_remote() -> bool:
-    return "" != os.environ.get("SSH_CLIENT", "")
+    return os.environ.get("SSH_CONNECTION") is not None
 
 
 def plt_show(filename: str | Path):
@@ -132,7 +132,8 @@ class Rerun:
         | SE3
         | LidarMeasurement
         | list[SE3]
-        | list[np.ndarray],
+        | list[np.ndarray]
+        | float,
         color: list[int] = [0, 0, 255],
         **kwargs,
     ):
@@ -185,3 +186,9 @@ class Rerun:
         elif isinstance(value, list) and isinstance(value[0], np.ndarray):
             value = cast(list[np.ndarray], value)
             rr.log(name, rr.Points3D(value, colors=color), **kwargs)
+
+        elif isinstance(value, float):
+            rr.log(name, rr.Scalar(value))
+
+        else:
+            raise ValueError(f"Unknown type for {name}")
