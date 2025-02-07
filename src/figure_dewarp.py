@@ -1,42 +1,42 @@
-from itertools import product
 from pathlib import Path
+from stats import compute_cache_stats
+from wrappers import plt_show
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-import numpy as np
+import polars as pl
 
-from params import ExperimentParams, Feature, Initialization
-from run import run_multithreaded
 
-# ------------------------- Everything to sweep over ------------------------- #
-num_threads = 20
-dir = Path("results/25.02.04_pseudo_tighter_range")
-
-datasets = [
-    "hilti_2022/construction_upper_level_1",
-    "oxford_spires/keble_college_02",
-    "newer_college_2020/01_short_experiment",
-    "newer_college_2021/quad-easy",
-]
-
-# ------------------------- Computer product of options ------------------------- #
-experiments_planar = [
-    ExperimentParams(
-        name="planar",
-        dataset=d,
-        features=[Feature.Planar],
-        init=Initialization.GroundTruth,
+def make_plot(df: pl.DataFrame, name: str, to_plot: str):
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
+    sns.lineplot(
+        df.filter(pl.col("init") == "GroundTruth"),
+        ax=ax[0],
+        x="dewarp",
+        y=f"{to_plot}r",
+        hue="dataset",
+        # style="init",
+        marker="o",
+        sort=True,
     )
-    for (d,) in product(datasets)
-]
-
-experiments_pseudo = [
-    ExperimentParams(
-        name=f"pseudo_{i:.3f}",
-        dataset=d,
-        features=[Feature.Pseudo_Planar],
-        pseudo_planar_epsilon=float(i),
-        init=Initialization.GroundTruth,
+    sns.lineplot(
+        df.filter(pl.col("init") == "GroundTruth"),
+        ax=ax[1],
+        x="dewarp",
+        y=f"{to_plot}t",
+        hue="dataset",
+        # style="init",
+        marker="o",
+        sort=True,
+        legend=False,
     )
-    for d, i in product(datasets, np.linspace(0.00, 0.2, 20)[1:])
-]
+    ax[0].legend().set_visible(False)
+    fig.legend(ncol=2, loc="outside lower center")
+    plt_show(Path("figures") / f"{name}_{to_plot}.png")
 
-run_multithreaded(experiments_planar + experiments_pseudo, dir, num_threads=num_threads)
+
+directory = Path("results/25.02.06_dewarp_with_init")
+df = compute_cache_stats(directory)
+
+make_plot(df, "dewarp", "RTE")
+make_plot(df, "dewarp", "ATE")

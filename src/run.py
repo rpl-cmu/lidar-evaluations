@@ -39,6 +39,7 @@ def run(
 ):
     # Sleep for a small blip to offset the progress bars
     if multithreaded_info is not None:
+        np.random.seed(0)
         sleep(np.random.rand())
 
     # Load the data
@@ -228,6 +229,16 @@ def run_multithreaded(
     ip: str = "0.0.0.0:9876",
     num_threads: int = 10,
 ):
+    # Make sure they're all unique
+    seen = set()
+    dupes = [
+        (x.dataset, x.name)
+        for x in eps
+        if x.name in seen or seen.add((x.dataset, x.name))
+    ]
+    if len(dupes) != 0:
+        raise ValueError(f"Duplicate experiment names {dupes}")
+
     # https://github.com/tqdm/tqdm/issues/1000#issuecomment-1842085328
     # tqdm still isn't perfect - can be a bit janky if resizing
     # but I'm fairly satisfied with it now
@@ -262,11 +273,11 @@ if __name__ == "__main__":
 
     eps = [
         params.ExperimentParams(
-            name="pseudo_0.948",
+            name="pseudo_0.5",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
-            pseudo_planar_epsilon=0.948,
+            pseudo_planar_epsilon=1.0,
             features=[params.Feature.Pseudo_Planar],
         ),
     ]
@@ -274,5 +285,5 @@ if __name__ == "__main__":
     directory = Path("results/25.02.06_visualize_new20")
     length = None
 
-    run(eps[0], directory, visualize=True, length=length)
+    run(eps[0], directory, visualize=False, length=length)
     # run_multithreaded(eps, directory, length=length)

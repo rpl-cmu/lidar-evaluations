@@ -22,22 +22,31 @@ class Metric:
 
 @dataclass(kw_only=True)
 class Error:
+    # Shape: (n, 3)
     trans: np.ndarray
     rot: np.ndarray
 
+    @cached_property
+    def rot_e(self) -> np.ndarray:
+        return np.linalg.norm(self.rot, axis=1)
+
+    @cached_property
+    def trans_e(self) -> np.ndarray:
+        return np.linalg.norm(self.trans, axis=1)
+
     def mean(self) -> Metric:
-        return Metric(rot=self.rot.mean(), trans=self.trans.mean())
+        return Metric(rot=self.rot_e.mean(), trans=self.trans_e.mean())
 
     def sse(self) -> Metric:
         return Metric(
-            rot=float(np.sqrt(self.rot @ self.rot)),
-            trans=float(np.sqrt(self.trans @ self.trans)),
+            rot=float(np.sqrt(self.rot_e @ self.rot_e)),
+            trans=float(np.sqrt(self.trans_e @ self.trans_e)),
         )
 
     def median(self) -> Metric:
         return Metric(
-            rot=cast(float, np.median(self.rot)),
-            trans=cast(float, np.median(self.trans)),
+            rot=cast(float, np.median(self.rot_e)),
+            trans=cast(float, np.median(self.trans_e)),
         )
 
 
@@ -77,13 +86,13 @@ class ExperimentResult:
     def _compute_metric(gts: list[SE3], poses: list[SE3]) -> Error:
         assert len(gts) == len(poses)
 
-        error_t = np.zeros(len(gts))
-        error_r = np.zeros(len(gts))
+        error_t = np.zeros((len(gts), 3))
+        error_r = np.zeros((len(gts), 3))
         for i, (gt, pose) in enumerate(zip(gts, poses)):
             delta = gt.inverse() * pose
-            error_t[i] = np.sqrt(delta.trans @ delta.trans)
+            error_t[i] = delta.trans
             r_diff = delta.rot.log()
-            error_r[i] = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+            error_r[i] = r_diff * 180 / np.pi
 
         return Error(rot=error_r, trans=error_t)
 
@@ -270,10 +279,10 @@ def eval(directories: list[Path], visualize: bool, sort: Optional[str] = None):
         print()
 
 
-def compute_cache_stats(directory: Path) -> pl.DataFrame:
+def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
     df_file = directory.parent / (directory.name + ".csv")
 
-    if not df_file.exists():
+    if not df_file.exists() or force:
         bottom_level_dirs = []
         for subdir in directory.glob("**/"):
             if not _contains_dir(subdir):

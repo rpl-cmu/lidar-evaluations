@@ -15,15 +15,56 @@ from params import ExperimentParams
 import os
 import matplotlib.pyplot as plt
 
+from itertools import chain, combinations
+
+import argparse
+
+
+def parser(name: str) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=f"{name} experiment")
+    subparsers = parser.add_subparsers(dest="action")
+
+    run_parser = subparsers.add_parser("run", help="Run the experiment")
+    run_parser.add_argument(
+        "-n",
+        "--num_threads",
+        type=int,
+        default=20,
+        help="Number of threads to use for multiprocessing",
+    )
+
+    plot_parser = subparsers.add_parser("plot", help="Plot the results")
+    plot_parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Force recomputing results",
+    )
+
+    args = parser.parse_args()
+    args.name = name
+    return args
+
+
+# For handling multiple tqdm progress bars
+# https://stackoverflow.com/questions/56665639/fix-jumping-of-multiple-progress-bars-tqdm-in-python-multiprocessing
+
+
+# https://docs.python.org/3/library/itertools.html#itertools-recipes
+def powerset(iterable):
+    "Subsequences of the iterable from shortest to longest."
+    # powerset([1,2,3]) → () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)
+    s = list(iterable)
+    return list(chain.from_iterable(combinations(s, r) for r in range(1, len(s) + 1)))
+
 
 def is_remote() -> bool:
     return os.environ.get("SSH_CONNECTION") is not None
 
 
 def plt_show(filename: str | Path):
-    if is_remote():
-        plt.savefig(filename)
-    else:
+    plt.savefig(filename)
+    if not is_remote():
         plt.show()
 
 
