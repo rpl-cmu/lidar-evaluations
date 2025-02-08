@@ -1,0 +1,133 @@
+from itertools import product
+from pathlib import Path
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import sys
+import polars as pl
+
+sys.path.append("src")
+from params import ExperimentParams, Feature, Initialization
+from wrappers import parser, plt_show
+from run import run_multithreaded
+from stats import compute_cache_stats
+
+# ------------------------- Everything to sweep over ------------------------- #
+dir = Path("results/25.02.07_plane_plane_full_experiment")
+
+
+def run(num_threads: int):
+    datasets = [
+        "hilti_2022/construction_upper_level_1",
+        "oxford_spires/keble_college_02",
+        # "newer_college_2020/01_short_experiment",
+        "newer_college_2021/quad-easy",
+    ]
+
+    init = [
+        Initialization.Identity,
+        Initialization.ConstantVelocity,
+        Initialization.GroundTruth,
+    ]
+
+    epsilon = np.linspace(0.00, 1.0, 11)
+
+    # ------------------------- Computer product of options ------------------------- #
+    experiments_planar = [
+        ExperimentParams(
+            name=f"planar_{i.name}",
+            dataset=d,
+            features=[Feature.Planar],
+            init=i,
+        )
+        for (d, i) in product(datasets, init)
+    ]
+
+    experiments_pseudo = [
+        ExperimentParams(
+            name=f"plane_plane_{i.name}_{val:.3f}",
+            dataset=d,
+            features=[Feature.Plane_Plane],
+            pseudo_planar_epsilon=float(val),
+            init=i,
+        )
+        for d, i, val in product(datasets, init, epsilon)
+    ]
+
+    experiments = experiments_planar + experiments_pseudo
+
+    run_multithreaded(experiments, dir, num_threads=num_threads)
+
+
+def plot(name: str, force: bool):
+    df = compute_cache_stats(dir, force=force)
+
+    print(
+        df.filter(
+            (pl.col("pseudo_planar_epsilon") == 0.1)
+            & (pl.col("init") == "ConstantVelocity")
+        ).select(["name", "dataset", "RTEr", "RTEt"])
+    )
+
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
+    sns.lineplot(
+        df.filter(~pl.col("name").str.contains("planar")),
+        ax=ax[0],
+        x="pseudo_planar_epsilon",
+        y="RTEr",
+        hue="dataset",
+        style="init",
+        markers=["s", "X", "o"],
+        style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        dashes=False,
+    )
+    sns.lineplot(
+        df.filter(~pl.col("name").str.contains("planar")),
+        ax=ax[1],
+        x="pseudo_planar_epsilon",
+        y="RTEt",
+        hue="dataset",
+        style="init",
+        markers=["s", "X", "o"],
+        style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        dashes=False,
+        legend=False,
+    )
+
+    sns.lineplot(
+        df.filter(pl.col("name").str.contains("planar")),
+        ax=ax[0],
+        x="pseudo_planar_epsilon",
+        y="RTEr",
+        hue="dataset",
+        style="init",
+        markers=["s", "X", "o"],
+        style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        dashes=False,
+        palette=("Greys"),
+    )
+    sns.lineplot(
+        df.filter(pl.col("name").str.contains("planar")),
+        ax=ax[1],
+        x="pseudo_planar_epsilon",
+        y="RTEt",
+        hue="dataset",
+        dashes=False,
+        style="init",
+        markers=["s", "X", "o"],
+        style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        legend=False,
+        palette=("Greys"),
+    )
+    ax[0].legend().set_visible(False)
+    fig.legend(ncol=2, loc="outside lower center")
+    plt_show(Path("figures") / f"{name}.png")
+
+
+if __name__ == "__main__":
+    args = parser("plane_plane")
+
+    if args.action == "run":
+        run(args.num_threads)
+    elif args.action == "plot":
+        plot(args.name, args.force)

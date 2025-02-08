@@ -1,7 +1,6 @@
 from functools import partial
-from multiprocessing import Manager, Pool
+from multiprocessing import Manager, Pool, Lock
 from pathlib import Path
-from time import sleep
 from typing import Optional, Sequence
 
 import numpy as np
@@ -15,12 +14,16 @@ from loam import Pose3d
 from wrappers import GroundTruthIterator, Rerun, Writer
 
 
+mutex = Lock()
+
+
 def get_pgb_pos(shared_list) -> int:
     # Acquire lock and get a progress bar slot
-    for i in range(len(shared_list)):
-        if not shared_list[i]:
-            shared_list[i] = True
-            return i
+    with mutex:
+        for i in range(len(shared_list)):
+            if not shared_list[i]:
+                shared_list[i] = True
+                return i
 
     raise ValueError("No available progress bar slots")
 
@@ -37,11 +40,6 @@ def run(
     length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
 ):
-    # Sleep for a small blip to offset the progress bars
-    if multithreaded_info is not None:
-        np.random.seed(0)
-        sleep(np.random.rand())
-
     # Load the data
     dataset = ep.build_dataset()
     # Load ground truth in lidar frame
@@ -83,6 +81,7 @@ def run(
     if multithreaded_info is not None:
         pbar_idx = get_pgb_pos(multithreaded_info)
         pbar_params["position"] = pbar_idx + 1
+        pbar_params["desc"] = f"#{pbar_idx:>2} " + pbar_params["desc"]
     pbar = tqdm(**pbar_params)
 
     # Setup writer
@@ -147,7 +146,7 @@ def run(
 
         # Get features and ground truth
         curr_feat = loam.extractFeatures(pts, lp, fp)
-        if not ep.planar and not ep.pseudo_planar:
+        if not ep.planar and not ep.pseudo_planar and not ep.plane_plane:
             curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
             curr_feat.planar_points = []
         if not ep.edge:
@@ -204,7 +203,6 @@ def run(
                 SO3(qx=np.nan, qy=np.nan, qz=np.nan, qw=np.nan),
                 np.array([np.nan, np.nan, np.nan]),
             )
-
         pbar.update()
 
         prev_prev_gt = prev_gt
@@ -269,21 +267,33 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "newer_college_2020/01_short_experiment"
+    dataset = "hilti_2022/construction_upper_level_1"
 
     eps = [
         params.ExperimentParams(
-            name="pseudo_0.5",
+            name="plane_plane",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
-            pseudo_planar_epsilon=1.0,
-            features=[params.Feature.Pseudo_Planar],
+            pseudo_planar_epsilon=0.0,
+            features=[params.Feature.Plane_Plane],
         ),
+        # params.ExperimentParams(
+        #     name="planar",
+        #     dataset=dataset,
+        #     init=params.Initialization.GroundTruth,
+        #     dewarp=params.Dewarp.Identity,
+        #     pseudo_planar_epsilon=0.0,
+        #     features=[params.Feature.Planar],
+        # ),
     ]
 
-    directory = Path("results/25.02.06_visualize_new20")
+    directory = Path("results/25.02.07_test_plane_plane")
     length = None
+    multithreaded = True
 
-    run(eps[0], directory, visualize=False, length=length)
-    # run_multithreaded(eps, directory, length=length)
+    if multithreaded:
+        run_multithreaded(eps, directory, length=length)
+    else:
+        for ep in eps:
+            run(ep, directory, visualize=False, length=length)

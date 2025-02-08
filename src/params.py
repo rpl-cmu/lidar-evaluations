@@ -24,6 +24,7 @@ class Feature(PrettyPrintEnum):
     Edge = 1
     Planar = 2
     Pseudo_Planar = 3
+    Plane_Plane = 4
 
 
 class Initialization(PrettyPrintEnum):
@@ -62,8 +63,8 @@ class ExperimentParams:
     def __post_init__(self):
         # Make sure features are valid
         assert len(self.features) > 0, "At least one feature must be selected"
-        assert not (self.planar and self.pseudo_planar), (
-            "Cannot have both planar and pseudo-planar features"
+        assert (self.planar + self.pseudo_planar + self.plane_plane) < 2, (
+            "Cannot have two of planar, pseudo-planar, or plane-plane features"
         )
         # Make sure dataset is valid
         DatasetBuilder.parse(self.dataset)
@@ -83,6 +84,10 @@ class ExperimentParams:
     @property
     def pseudo_planar(self) -> bool:
         return Feature.Pseudo_Planar in self.features
+
+    @property
+    def plane_plane(self):
+        return Feature.Plane_Plane in self.features
 
     def feature_params(self) -> loam.FeatureExtractionParams:
         feat_params = loam.FeatureExtractionParams()
@@ -104,11 +109,14 @@ class ExperimentParams:
     def registration_params(self) -> loam.RegistrationParams:
         reg_params = loam.RegistrationParams()
         reg_params.max_iterations = 20
-        # TODO: This could probably use some tuning!
         reg_params.pseudo_plane_normal_epsilon = self.pseudo_planar_epsilon
 
-        if self.pseudo_planar:
+        if self.planar:
+            reg_params.planar_version = loam.PlanarVersion.TRUE_PLANAR
+        elif self.pseudo_planar:
             reg_params.planar_version = loam.PlanarVersion.PSEUDO_PLANAR
+        elif self.plane_plane:
+            reg_params.planar_version = loam.PlanarVersion.PLANE_PLANE
 
         return reg_params
 
@@ -134,5 +142,4 @@ class ExperimentParams:
             + "/"
             + "".join(short(d) for d in seq.split("_"))
         )
-
-        return f"ds: {ds}, {self.name}"
+        return f"ds: {ds:>8}, {self.name[:20]:>20}"
