@@ -17,7 +17,7 @@ sns.set_style("whitegrid")
 
 files = [
     # "results/25.02.04_pseudo/newer_college_2020/01_short_experiment/pseudo_0.114.csv",
-    # "results/25.02.04_pseudo/newer_college_2020/01_short_experiment/pseudo_0.948.csv",
+    "results/25.02.04_pseudo/newer_college_2020/01_short_experiment/pseudo_0.948.csv",
     "results/25.02.04_pseudo/newer_college_2020/01_short_experiment/planar.csv",
 ]
 
@@ -27,22 +27,14 @@ for f in files:
     exp = ExperimentResult.load(Path(f))
     rte = exp.rte()
 
-    # vel = np.asarray([np.linalg.norm(x.trans) for x in exp.gt])
-    # sns.lineplot(vel, ax=ax[1], label="vel", alpha=0.5)
+    print(rte.trans_e.max())
 
-    sns.histplot(
-        x=rte.rot[:, 0],
-        y=rte.rot[:, 1],
-        ax=ax[0],
-        label=exp.params.name,
-        bins=50,
-    )
-    sns.histplot(
-        x=rte.trans[:, 0],
-        y=rte.trans[:, 1],
-        ax=ax[1],
-        label=exp.params.name,
-        bins=50,
+    vel = np.asarray([np.linalg.norm(x.trans) for x in exp.gt])
+
+    sns.lineplot(moving_average(rte.rot_e), ax=ax[0], label=exp.params.name, alpha=0.5)
+    sns.lineplot(moving_average(vel), ax=ax[1], label="vel", alpha=0.5)
+    sns.lineplot(
+        moving_average(rte.trans_e), ax=ax[1], label=exp.params.name, alpha=0.5
     )
 
 ax[0].legend()

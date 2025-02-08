@@ -69,12 +69,19 @@ def plot(name: str, force: bool):
         ).select(["name", "dataset", "RTEr", "RTEt"])
     )
 
+    print(
+        df.filter(
+            (pl.col("pseudo_planar_epsilon") == 0.1)
+            & (pl.col("init") == "ConstantVelocity")
+        ).select(["name", "dataset", "wRTEr", "wRTEt"])
+    )
+
     fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
     sns.lineplot(
         df.filter(~pl.col("name").str.contains("planar")),
         ax=ax[0],
         x="pseudo_planar_epsilon",
-        y="RTEr",
+        y="wRTEr",
         hue="dataset",
         style="init",
         markers=["s", "X", "o"],
@@ -85,7 +92,7 @@ def plot(name: str, force: bool):
         df.filter(~pl.col("name").str.contains("planar")),
         ax=ax[1],
         x="pseudo_planar_epsilon",
-        y="RTEt",
+        y="wRTEt",
         hue="dataset",
         style="init",
         markers=["s", "X", "o"],
@@ -98,7 +105,7 @@ def plot(name: str, force: bool):
         df.filter(pl.col("name").str.contains("planar")),
         ax=ax[0],
         x="pseudo_planar_epsilon",
-        y="RTEr",
+        y="wRTEr",
         hue="dataset",
         style="init",
         markers=["s", "X", "o"],
@@ -110,7 +117,7 @@ def plot(name: str, force: bool):
         df.filter(pl.col("name").str.contains("planar")),
         ax=ax[1],
         x="pseudo_planar_epsilon",
-        y="RTEt",
+        y="wRTEt",
         hue="dataset",
         dashes=False,
         style="init",

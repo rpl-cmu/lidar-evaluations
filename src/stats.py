@@ -102,6 +102,19 @@ class ExperimentResult:
     def rte(self) -> Error:
         return self._compute_metric(self.gt, self.poses)
 
+    def windowed_rte(self, window: int = 10) -> Error:
+        window_deltas_poses = []
+        window_deltas_gts = []
+        for i in range(len(self.gt) - window):
+            window_deltas_poses.append(
+                self.iterated_poses[i].inverse() * self.iterated_poses[i + window]
+            )
+            window_deltas_gts.append(
+                self.iterated_gt[i].inverse() * self.iterated_gt[i + window]
+            )
+
+        return self._compute_metric(window_deltas_gts, window_deltas_poses)
+
     def get_feature(self, feature: Feature) -> np.ndarray:
         return self.features[feature]
 
@@ -213,11 +226,17 @@ def eval_dataset(
 
     results = []
     for exp in experiments:
+        window10_rte = exp.windowed_rte(10).mean()
+        window100_rte = exp.windowed_rte(100).mean()
         rte = exp.rte().mean()
         ate = exp.ate().mean()
         r = asdict(exp.params)
         r.update(
             {
+                "w10_RTEt": window10_rte.trans,
+                "w10_RTEr": window10_rte.rot,
+                "w100_RTEt": window100_rte.trans,
+                "w100_RTEr": window100_rte.rot,
                 "RTEt": rte.trans,
                 "RTEr": rte.rot,
                 "ATEt": ate.trans,
