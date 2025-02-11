@@ -10,12 +10,11 @@ sys.path.append("src")
 from params import ExperimentParams, Feature
 from stats import ExperimentResult
 from run import run_multithreaded
-from wrappers import plt_show, parser
+from wrappers import plt_show, parser, setup_plot
 from dataclasses import asdict
 
 
 dir = Path("results/25.02.10_window_effect")
-sns.set_style("whitegrid")
 
 
 def run(num_threads: int):
@@ -39,6 +38,8 @@ def run(num_threads: int):
 
 
 def plot(name: str, force: bool):
+    _c = setup_plot()
+
     df_file = dir.parent / (dir.name + ".csv")
 
     # Custom loading to computing all window results
@@ -46,7 +47,7 @@ def plot(name: str, force: bool):
     if not df_file.exists() or force:
         files = [f for f in dir.glob("**/*.csv")]
 
-        windows = np.arange(0, 1000, 100)
+        windows = np.arange(0, 800, 50)
         windows[0] = 1
 
         results = []
@@ -60,10 +61,10 @@ def plot(name: str, force: bool):
             exp_dict["dewarp"] = exp_dict["dewarp"].name
 
             for w in tqdm(windows, leave=False):
-                rte = exp.windowed_rte(window=int(w)).mean()
+                rte = exp.windowed_rte(window=int(w)).sse()
                 results.append(
                     {
-                        "window": w,
+                        "window": w / 10,
                         "rot": rte.rot,
                         "trans": rte.trans,
                         **exp_dict,
@@ -75,7 +76,7 @@ def plot(name: str, force: bool):
     else:
         df = pl.read_csv(df_file)
 
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4), layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(4, 2), layout="constrained")
     sns.lineplot(
         df,
         x="window",
@@ -86,7 +87,13 @@ def plot(name: str, force: bool):
     )
 
     ax.legend().set_visible(False)
-    fig.legend(ncol=2, loc="outside lower center")
+    ax.set_ylabel(r"$RTE_j$ (m)", labelpad=1)
+    ax.set_xlabel(r"Window (sec)", labelpad=1)
+    ax.tick_params(axis="x", pad=-2)
+    ax.tick_params(axis="y", pad=-2)
+
+    # TODO: Clean up legend to list trajectories better
+    # fig.legend(ncol=2, loc="outside lower center")
 
     plt_show(Path("figures") / f"{name}.png")
     plt.savefig(Path("graphics") / f"{name}.pdf", dpi=300)

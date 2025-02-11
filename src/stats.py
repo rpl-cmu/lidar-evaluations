@@ -38,9 +38,10 @@ class Error:
         return Metric(rot=self.rot_e.mean(), trans=self.trans_e.mean())
 
     def sse(self) -> Metric:
+        length = len(self.rot_e)
         return Metric(
-            rot=float(np.sqrt(self.rot_e @ self.rot_e)),
-            trans=float(np.sqrt(self.trans_e @ self.trans_e)),
+            rot=float(np.sqrt(self.rot_e @ self.rot_e / length)),
+            trans=float(np.sqrt(self.trans_e @ self.trans_e / length)),
         )
 
     def median(self) -> Metric:

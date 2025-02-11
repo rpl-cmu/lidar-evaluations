@@ -18,6 +18,23 @@ import matplotlib.pyplot as plt
 from itertools import chain, combinations
 
 import argparse
+import matplotlib
+import seaborn as sns
+
+
+def setup_plot():
+    matplotlib.rc("pdf", fonttype=42)
+    sns.set_context("paper")
+    sns.set_style("whitegrid")
+    sns.set_palette("colorblind")
+    c = sns.color_palette("colorblind")
+
+    # Make sure you install times & clear matplotlib cache
+    # https://stackoverflow.com/a/49884009
+    plt.rcParams["font.family"] = "Times New Roman"
+    plt.rcParams["mathtext.fontset"] = "stix"
+
+    return c
 
 
 def parser(name: str) -> argparse.Namespace:
