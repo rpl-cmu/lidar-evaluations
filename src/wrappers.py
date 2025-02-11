@@ -92,9 +92,9 @@ class GroundTruthIterator:
 
     def next(self, stamp: Stamp, tol: float = 1e-2) -> Optional[SE3]:
         # If our first ground truth is in the future, we'll have to skip for a bit
-        if self.traj.stamps[self.idx] > stamp:
+        if self.idx >= len(self.traj):
             return None
-        elif self.idx > len(self.traj):
+        elif self.traj.stamps[self.idx] > stamp:
             return None
 
         while (

@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import sys
+import polars as pl
 
 sys.path.append("src")
 from params import ExperimentParams, Feature, Initialization
@@ -11,11 +12,12 @@ from wrappers import parser, plt_show
 from run import run_multithreaded
 from stats import compute_cache_stats
 
-# ------------------------- Everything to sweep over ------------------------- #
 dir = Path("results/25.02.07_pseudo_new_projector")
+# dir = Path("results/25.02.10_pseudo_new_projector_tighter_range")
 
 
 def run(num_threads: int):
+    # ------------------------- Everything to sweep over ------------------------- #
     datasets = [
         "hilti_2022/construction_upper_level_1",
         "oxford_spires/keble_college_02",
@@ -29,14 +31,14 @@ def run(num_threads: int):
         Initialization.GroundTruth,
     ]
 
-    epsilon = np.linspace(0.00, 1.0, 11)
+    epsilon = np.linspace(0.00, 0.2, 11)
 
     # ------------------------- Computer product of options ------------------------- #
     experiments_planar = [
         ExperimentParams(
             name=f"planar_{i.name}",
             dataset=d,
-            features=[Feature.Planar],
+            features=[Feature.Point_Plane],
             init=i,
         )
         for (d, i) in product(datasets, init)
@@ -46,7 +48,7 @@ def run(num_threads: int):
         ExperimentParams(
             name=f"pseudo_{i.name}_{val:.3f}",
             dataset=d,
-            features=[Feature.Pseudo_Planar],
+            features=[Feature.Point_Plane],
             pseudo_planar_epsilon=float(val),
             init=i,
         )
@@ -60,13 +62,14 @@ def run(num_threads: int):
 
 def plot(name: str, force: bool):
     df = compute_cache_stats(dir, force=force)
+    df = df.filter(~pl.col("name").str.contains("planar"))
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
     sns.lineplot(
         df,
         ax=ax[0],
         x="pseudo_planar_epsilon",
-        y="RTEr",
+        y="w100_RTEr",
         hue="dataset",
         style="init",
         markers=["s", "X", "o"],
@@ -77,7 +80,7 @@ def plot(name: str, force: bool):
         df,
         ax=ax[1],
         x="pseudo_planar_epsilon",
-        y="RTEt",
+        y="w100_RTEt",
         hue="dataset",
         style="init",
         markers=["s", "X", "o"],
@@ -91,7 +94,7 @@ def plot(name: str, force: bool):
 
 
 if __name__ == "__main__":
-    args = parser("curvature")
+    args = parser("pseudo")
 
     if args.action == "run":
         run(args.num_threads)

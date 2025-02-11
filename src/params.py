@@ -23,8 +23,6 @@ class Feature(PrettyPrintEnum):
     Point = 0
     Edge = 1
     Planar = 2
-    Pseudo_Planar = 3
-    Plane_Plane = 4
 
 
 class Initialization(PrettyPrintEnum):
@@ -56,16 +54,14 @@ class ExperimentParams:
     curvature: Curvature = Curvature.Loam
     curvature_planar_threshold: float = 1.0
     # registration
-    pseudo_planar_epsilon: float = 0.1
+    pseudo_planar_epsilon: float = 0.0
+    use_plane_to_plane: bool = False
     init: Initialization = Initialization.GroundTruth
     dewarp: Dewarp = Dewarp.Identity
 
     def __post_init__(self):
         # Make sure features are valid
         assert len(self.features) > 0, "At least one feature must be selected"
-        assert (self.planar + self.pseudo_planar + self.plane_plane) < 2, (
-            "Cannot have two of planar, pseudo-planar, or plane-plane features"
-        )
         # Make sure dataset is valid
         DatasetBuilder.parse(self.dataset)
 
@@ -78,16 +74,8 @@ class ExperimentParams:
         return Feature.Edge in self.features
 
     @property
-    def planar(self) -> bool:
+    def planar(self):
         return Feature.Planar in self.features
-
-    @property
-    def pseudo_planar(self) -> bool:
-        return Feature.Pseudo_Planar in self.features
-
-    @property
-    def plane_plane(self):
-        return Feature.Plane_Plane in self.features
 
     def feature_params(self) -> loam.FeatureExtractionParams:
         feat_params = loam.FeatureExtractionParams()
@@ -98,25 +86,20 @@ class ExperimentParams:
         feat_params.max_point_feats_per_sector = 50
 
         feat_params.edge_feat_threshold = 50.0
-        feat_params.curvature_type = self.curvature.into()
-        feat_params.planar_feat_threshold = self.curvature_planar_threshold
-
         feat_params.occlusion_thresh = 0.9
         feat_params.parallel_thresh = 0.01
+
+        feat_params.curvature_type = self.curvature.into()
+        feat_params.planar_feat_threshold = self.curvature_planar_threshold
 
         return feat_params
 
     def registration_params(self) -> loam.RegistrationParams:
         reg_params = loam.RegistrationParams()
         reg_params.max_iterations = 20
-        reg_params.pseudo_plane_normal_epsilon = self.pseudo_planar_epsilon
 
-        if self.planar:
-            reg_params.planar_version = loam.PlanarVersion.TRUE_PLANAR
-        elif self.pseudo_planar:
-            reg_params.planar_version = loam.PlanarVersion.PSEUDO_PLANAR
-        elif self.plane_plane:
-            reg_params.planar_version = loam.PlanarVersion.PLANE_PLANE
+        reg_params.pseudo_plane_normal_epsilon = self.pseudo_planar_epsilon
+        reg_params.use_plane_to_plane = self.use_plane_to_plane
 
         return reg_params
 

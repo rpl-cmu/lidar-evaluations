@@ -7,21 +7,24 @@ import sys
 
 sys.path.append("src")
 from params import ExperimentParams, Feature, Initialization, Dewarp
-from wrappers import parser, plt_show
+from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
 
 
-dir = Path("results/25.02.06_dewarp_with_init")
+# dir = Path("results/25.02.06_dewarp_with_init")
+dir = Path("results/25.02.10_dewarp_multi_campus")
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
     datasets = [
-        "hilti_2022/construction_upper_level_1",
-        "oxford_spires/keble_college_02",
-        "newer_college_2020/01_short_experiment",
-        "newer_college_2021/quad-easy",
+        "multi_campus_2024/ntu_day_02",
+        "multi_campus_2024/ntu_day_10",
+        "multi_campus_2024/kth_day_09",
+        "multi_campus_2024/kth_day_10",
+        "multi_campus_2024/tuhh_day_04",
+        "multi_campus_2024/tuhh_night_09",
     ]
 
     dewarp = [
@@ -41,7 +44,7 @@ def run(num_threads: int):
         ExperimentParams(
             name=f"{de.name}_{i.name}",
             dataset=d,
-            features=[Feature.Planar],
+            features=[Feature.Point_Plane],
             dewarp=de,
             init=i,
         )
@@ -81,11 +84,12 @@ def make_plot(df: pl.DataFrame, name: str, to_plot: str):
 
 
 def plot(name: str, force: bool):
+    setup_plot()
     df = compute_cache_stats(dir, force)
-    make_plot(df, "dewarp", "RTE")
-    make_plot(df, "dewarp", "w10_RTE")
-    make_plot(df, "dewarp", "w100_RTE")
-    make_plot(df, "dewarp", "ATE")
+    make_plot(df, name, "RTE")
+    # make_plot(df, name, "w10_RTE")
+    make_plot(df, name, "w100_RTE")
+    # make_plot(df, name, "ATE")
 
 
 if __name__ == "__main__":

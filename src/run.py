@@ -146,7 +146,7 @@ def run(
 
         # Get features and ground truth
         curr_feat = loam.extractFeatures(pts, lp, fp)
-        if not ep.planar and not ep.pseudo_planar and not ep.plane_plane:
+        if not ep.planar:
             curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
             curr_feat.planar_points = []
         if not ep.edge:
@@ -271,25 +271,27 @@ if __name__ == "__main__":
 
     eps = [
         params.ExperimentParams(
-            name="plane_plane",
+            name="before_pseudo_plane_0.1",
+            dataset=dataset,
+            init=params.Initialization.GroundTruth,
+            dewarp=params.Dewarp.Identity,
+            pseudo_planar_epsilon=0.1,
+            use_plane_to_plane=True,
+            features=[params.Feature.Planar],
+        ),
+        params.ExperimentParams(
+            name="before_pseudo_plane",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
             pseudo_planar_epsilon=0.0,
-            features=[params.Feature.Plane_Plane],
+            use_plane_to_plane=True,
+            features=[params.Feature.Planar],
         ),
-        # params.ExperimentParams(
-        #     name="planar",
-        #     dataset=dataset,
-        #     init=params.Initialization.GroundTruth,
-        #     dewarp=params.Dewarp.Identity,
-        #     pseudo_planar_epsilon=0.0,
-        #     features=[params.Feature.Planar],
-        # ),
     ]
 
-    directory = Path("results/25.02.07_test_plane_plane")
-    length = None
+    directory = Path("results/25.02.10_test_planar_after_after_after")
+    length = 100
     multithreaded = True
 
     if multithreaded:
