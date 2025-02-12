@@ -13,7 +13,7 @@ from run import run_multithreaded
 from stats import compute_cache_stats
 
 # ------------------------- Everything to sweep over ------------------------- #
-dir = Path("results/25.02.07_plane_plane_full_experiment")
+dir = Path("results/25.02.11_plane_plane_fixes")
 
 
 def run(num_threads: int):
@@ -30,7 +30,7 @@ def run(num_threads: int):
         Initialization.GroundTruth,
     ]
 
-    epsilon = np.linspace(0.00, 1.0, 11)
+    epsilon = np.linspace(0.00, 0.2, 11)
 
     # ------------------------- Computer product of options ------------------------- #
     experiments_planar = [
@@ -47,8 +47,9 @@ def run(num_threads: int):
         ExperimentParams(
             name=f"plane_plane_{i.name}_{val:.3f}",
             dataset=d,
-            features=[Feature.Plane_Plane],
+            features=[Feature.Planar],
             pseudo_planar_epsilon=float(val),
+            use_plane_to_plane=True,
             init=i,
         )
         for d, i, val in product(datasets, init, epsilon)
@@ -62,27 +63,15 @@ def run(num_threads: int):
 def plot(name: str, force: bool):
     df = compute_cache_stats(dir, force=force)
 
-    print(
-        df.filter(
-            (pl.col("pseudo_planar_epsilon") == 0.1)
-            & (pl.col("init") == "ConstantVelocity")
-        ).select(["name", "dataset", "RTEr", "RTEt"])
-    )
-
-    print(
-        df.filter(
-            (pl.col("pseudo_planar_epsilon") == 0.1)
-            & (pl.col("init") == "ConstantVelocity")
-        ).select(["name", "dataset", "wRTEr", "wRTEt"])
-    )
+    df = df.filter(pl.col("dataset").str.contains("quad"))
 
     fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
     sns.lineplot(
         df.filter(~pl.col("name").str.contains("planar")),
         ax=ax[0],
         x="pseudo_planar_epsilon",
-        y="wRTEr",
-        hue="dataset",
+        y="w100_RTEr",
+        # hue="dataset",
         style="init",
         markers=["s", "X", "o"],
         style_order=["Identity", "ConstantVelocity", "GroundTruth"],
@@ -92,8 +81,8 @@ def plot(name: str, force: bool):
         df.filter(~pl.col("name").str.contains("planar")),
         ax=ax[1],
         x="pseudo_planar_epsilon",
-        y="wRTEt",
-        hue="dataset",
+        y="w100_RTEt",
+        # hue="dataset",
         style="init",
         markers=["s", "X", "o"],
         style_order=["Identity", "ConstantVelocity", "GroundTruth"],
@@ -105,8 +94,8 @@ def plot(name: str, force: bool):
         df.filter(pl.col("name").str.contains("planar")),
         ax=ax[0],
         x="pseudo_planar_epsilon",
-        y="wRTEr",
-        hue="dataset",
+        y="w100_RTEr",
+        # hue="dataset",
         style="init",
         markers=["s", "X", "o"],
         style_order=["Identity", "ConstantVelocity", "GroundTruth"],
@@ -117,8 +106,8 @@ def plot(name: str, force: bool):
         df.filter(pl.col("name").str.contains("planar")),
         ax=ax[1],
         x="pseudo_planar_epsilon",
-        y="wRTEt",
-        hue="dataset",
+        y="w100_RTEt",
+        # hue="dataset",
         dashes=False,
         style="init",
         markers=["s", "X", "o"],

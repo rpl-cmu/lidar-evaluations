@@ -72,7 +72,7 @@ def run(
     pbar_params = {
         "total": len(data_iter),  # type: ignore
         "dynamic_ncols": True,
-        "leave": False,
+        "leave": True,
         "desc": f"[{ep.short_info()}]",
     }
     if length is not None:
@@ -82,6 +82,7 @@ def run(
         pbar_idx = get_pgb_pos(multithreaded_info)
         pbar_params["position"] = pbar_idx + 1
         pbar_params["desc"] = f"#{pbar_idx:>2} " + pbar_params["desc"]
+        pbar_params["leave"] = False
     pbar = tqdm(**pbar_params)
 
     # Setup writer
@@ -267,32 +268,32 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "hilti_2022/construction_upper_level_1"
+    dataset = "multi_campus_2024/ntu_day_02"
 
     eps = [
+        # params.ExperimentParams(
+        #     name="before_pseudo_plane_0.1",
+        #     dataset=dataset,
+        #     init=params.Initialization.GroundTruth,
+        #     dewarp=params.Dewarp.Identity,
+        #     pseudo_planar_epsilon=0.1,
+        #     use_plane_to_plane=True,
+        #     features=[params.Feature.Planar],
+        # ),
         params.ExperimentParams(
-            name="before_pseudo_plane_0.1",
-            dataset=dataset,
-            init=params.Initialization.GroundTruth,
-            dewarp=params.Dewarp.Identity,
-            pseudo_planar_epsilon=0.1,
-            use_plane_to_plane=True,
-            features=[params.Feature.Planar],
-        ),
-        params.ExperimentParams(
-            name="before_pseudo_plane",
+            name="without_transform",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
             pseudo_planar_epsilon=0.0,
-            use_plane_to_plane=True,
+            use_plane_to_plane=False,
             features=[params.Feature.Planar],
         ),
     ]
 
-    directory = Path("results/25.02.10_test_planar_after_after_after")
-    length = 100
-    multithreaded = True
+    directory = Path("results/25.02.11_test_ceva_multi_campus_before")
+    length = 500
+    multithreaded = False
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
