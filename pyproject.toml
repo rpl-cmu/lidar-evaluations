@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "evalio",
     "gdown>=5.2.0",
+    "gtsam>=4.2",
     "ipython>=8.32.0",
     "loam",
     "matplotlib>=3.10.0",

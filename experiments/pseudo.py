@@ -38,7 +38,7 @@ def run(num_threads: int):
         ExperimentParams(
             name=f"planar_{i.name}",
             dataset=d,
-            features=[Feature.Point_Plane],
+            features=[Feature.Planar],
             init=i,
         )
         for (d, i) in product(datasets, init)
