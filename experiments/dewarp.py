@@ -13,29 +13,24 @@ from stats import compute_cache_stats
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
-dir = Path("results/25.02.10_dewarp_multi_campus")
+dir = Path("results/25.02.13_ncd21_imu_dewarp_doubled_gyro")
+dir = Path("results/25.02.13_multi_imu_dewarp")
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    datasets = [
-        "multi_campus_2024/ntu_day_02",
-        "multi_campus_2024/ntu_day_10",
-        "multi_campus_2024/kth_day_09",
-        "multi_campus_2024/kth_day_10",
-        "multi_campus_2024/tuhh_day_04",
-        "multi_campus_2024/tuhh_night_09",
-    ]
+    datasets = ["newer_college_2021/quad-easy"]
+    datasets = ["multi_campus_2024/tuhh_day_04"]
 
     dewarp = [
         Dewarp.Identity,
         Dewarp.ConstantVelocity,
-        Dewarp.GroundTruth,
+        Dewarp.Imu,
     ]
 
     init = [
-        Initialization.Identity,
-        Initialization.ConstantVelocity,
+        # Initialization.Identity,
+        # Initialization.ConstantVelocity,
         Initialization.GroundTruth,
     ]
 
@@ -44,7 +39,7 @@ def run(num_threads: int):
         ExperimentParams(
             name=f"{de.name}_{i.name}",
             dataset=d,
-            features=[Feature.Point_Plane],
+            features=[Feature.Planar],
             dewarp=de,
             init=i,
         )

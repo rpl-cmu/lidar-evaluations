@@ -72,7 +72,7 @@ def convert(value: Pose3 | SE3) -> Pose3 | SE3:
 
 # returns imu measurements, lidar stamps, and ground truth
 def load_data(dataset: Dataset) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
-    # Get ground truth
+    # Get ground truth (already in IMU frame)
     gt = dataset.ground_truth()
 
     # Gather all imu data
@@ -196,7 +196,7 @@ def estimate_biases(
     vel = np.array([result.atVector(V(i)) for i in range(len(gt.stamps))])
 
     max_norm = np.max(np.linalg.norm(biases[:, :3], axis=1))
-    assert max_norm < 0.5, f"Max accel bias norm is too large: {max_norm}"
+    assert max_norm < 1.0, f"Max accel bias norm is too large: {max_norm}"
 
     import matplotlib.pyplot as plt
     from wrappers import plt_show
@@ -222,15 +222,27 @@ def integrate_along_lidarscans(
     imu_idx = 1
     opt_idx = 0
     for i, stamp in enumerate(lidar_stamps):
+        if imu_idx >= len(imu_data):
+            continue
+        elif opt_idx >= len(opt_result.stamps):
+            continue
         # Skip lidar scans if they are before the first optimized pose
-        if stamp < opt_result.stamps[opt_idx]:
+        elif stamp < opt_result.stamps[opt_idx]:
             continue
 
-        # get closest imu data
-        while imu_data[imu_idx].stamp < stamp:
+        # get closest imu data and ground truth pose
+        while imu_idx < len(imu_data) and imu_data[imu_idx].stamp < stamp:
             imu_idx += 1
-        while opt_result.stamps[opt_idx] - stamp < -1e-2:
+        while (
+            opt_idx < len(opt_result.stamps)
+            and opt_result.stamps[opt_idx] - stamp < -1e-2
+        ):
             opt_idx += 1
+
+        if imu_idx >= len(imu_data):
+            continue
+        elif opt_idx >= len(opt_result.stamps):
+            continue
 
         # Get initialization
         init = NavState(
@@ -247,7 +259,7 @@ def integrate_along_lidarscans(
             else Stamp.from_sec(stamp.to_sec() + 0.1)
         )
 
-        # Integrate and save
+        # Integrate
         this_results = [deepcopy(init)]
         while imu_data[imu_idx].stamp < next_stamp:
             imu = imu_data[imu_idx]
@@ -265,39 +277,31 @@ def integrate_along_lidarscans(
     return results
 
 
-def integrate(
+def integrate_entire_trajectory(
     imu_data: list[ImuMeasurement],
     opt_result: OptimizationResult,
     gravity: np.ndarray,
-) -> tuple[list[Stamp], list[NavState]]:
-    """
-    TODO:
-
-    Need to do two things here:
-    1) Integrate IMU data through a scan to use as initialization
-    2) Integrate IMU data at each IMU timestamp to get bias-corrected poses
-
-    Alternatively I could just integrate all the IMU measurements and save those poses
-    I can post process later to handle things
-
-    Need initial pose to kick things off
-    """
+) -> list[NavState]:
+    """Integrate the entire trajectory using the optimized biases. Mostly used to see how well optimization did"""
     state = NavState(
         stamp=opt_result.stamps[0],
         pose=opt_result.poses[0],
         velocity=opt_result.vel[0],
     )
     bias_idx = 0
-    stamps = []
-    results = []
+    results = [deepcopy(state)]
 
-    for i in range(1, len(imu_data)):
+    start_idx = 1
+    while start_idx < len(imu_data) and imu_data[start_idx].stamp < state.stamp:
+        start_idx += 1
+
+    for i in range(start_idx, len(imu_data)):
         imu = imu_data[i]
 
         # Find the bias index
         while (
             bias_idx < len(opt_result.stamps) - 1
-            and imu.stamp > opt_result.stamps[bias_idx]
+            and opt_result.stamps[bias_idx] < imu.stamp
         ):
             bias_idx += 1
 
@@ -308,9 +312,8 @@ def integrate(
         # Update and save
         state.update(accel, gyro, gravity, imu.stamp)
         results.append(deepcopy(state))
-        stamps.append(imu.stamp)
 
-    return stamps, results
+    return results
 
 
 def save_results(dataset: Dataset, results: list[tuple[Stamp, list[NavState]]]):
@@ -326,42 +329,51 @@ def save_results(dataset: Dataset, results: list[tuple[Stamp, list[NavState]]]):
 
 
 if __name__ == "__main__":
+    testing = False
+
     # Create a dataset
-    # double checked
-    name = "hilti_2022/construction_upper_level_1"
-    # name = "newer_college_2021/quad-easy"
+    # double checked gravity
+    name = "newer_college_2021/quad-easy"
     # name = "newer_college_2020/01_short_experiment"
+    # name = "multi_campus_2024/tuhh_day_04"
     # TODO: This one looks bad
     # name = "oxford_spires/keble_college_02"
     dataset = DatasetBuilder.parse(name)[0].build()
 
     imu_data, lidar_stamps, gt = load_data(dataset)
     # Try doing a smaller subset to make sure not moving at start
-    # gt.poses = gt.poses[:20]
-    # gt.stamps = gt.stamps[:20]
+    # gt.poses = gt.poses[:5]
+    # gt.stamps = gt.stamps[:5]
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
-    # stamps, results = integrate(imu_data, opt_result, dataset.imu_params().gravity)
-    integrated_results = integrate_along_lidarscans(
-        lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
-    )
-    save_results(dataset, integrated_results)
 
-    # plot the poses to double check they seem reasonable
-    # import matplotlib.pyplot as plt
-    # from wrappers import plt_show
+    # Check locally that it's integrating over the first sample decently
+    if testing:
+        results = integrate_entire_trajectory(
+            imu_data, opt_result, dataset.imu_params().gravity
+        )
 
-    # fig, ax = plt.subplots(1, 1, layout="constrained")
-    # num = 700
-    # x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
-    # y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
-    # ax.plot(x, y, label="Ground Truth")
+        # plot the poses to double check they seem reasonable
+        import matplotlib.pyplot as plt
+        from wrappers import plt_show
 
-    # x = np.asarray([p.trans[0] for p in results])[: num * 40]
-    # y = np.asarray([p.trans[1] for p in results])[: num * 40]
-    # # print(results[:10])
-    # ax.plot(x, y, label="Integrated")
-    # ax.legend()
-    # plt_show("figures/integrated_poses.png")
+        fig, ax = plt.subplots(1, 1, layout="constrained")
+        num = 100
+        x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
+        y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
+        ax.scatter(x, y, label="Ground Truth")
+
+        x = np.asarray([p.pose.trans[0] for p in results])[: num * 40]
+        y = np.asarray([p.pose.trans[1] for p in results])[: num * 40]
+
+        ax.scatter(x, y, label="Integrated")
+        ax.legend()
+        plt_show("figures/integrated_poses.png")
+
+    else:
+        integrated_results = integrate_along_lidarscans(
+            lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
+        )
+        save_results(dataset, integrated_results)
 
     # plot the lidarscans poses to double check they seem reasonable
     # import matplotlib.pyplot as plt

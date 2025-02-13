@@ -281,17 +281,18 @@ def run_multithreaded(
 if __name__ == "__main__":
     dataset = "multi_campus_2024/ntu_day_02"
     dataset = "hilti_2022/construction_upper_level_1"
+    dataset = "newer_college_2021/quad-easy"
 
     eps = [
-        params.ExperimentParams(
-            name="id_init",
-            dataset=dataset,
-            init=params.Initialization.Identity,
-            dewarp=params.Dewarp.Identity,
-            pseudo_planar_epsilon=0.0,
-            use_plane_to_plane=False,
-            features=[params.Feature.Planar],
-        ),
+        # params.ExperimentParams(
+        #     name="id_init",
+        #     dataset=dataset,
+        #     init=params.Initialization.Identity,
+        #     dewarp=params.Dewarp.Identity,
+        #     pseudo_planar_epsilon=0.0,
+        #     use_plane_to_plane=False,
+        #     features=[params.Feature.Planar],
+        # ),
         params.ExperimentParams(
             name="gt_init",
             dataset=dataset,
@@ -301,24 +302,24 @@ if __name__ == "__main__":
             use_plane_to_plane=False,
             features=[params.Feature.Planar],
         ),
-        params.ExperimentParams(
-            name="cv_init",
-            dataset=dataset,
-            init=params.Initialization.ConstantVelocity,
-            dewarp=params.Dewarp.Identity,
-            pseudo_planar_epsilon=0.0,
-            use_plane_to_plane=False,
-            features=[params.Feature.Planar],
-        ),
-        params.ExperimentParams(
-            name="imu_dewarp",
-            dataset=dataset,
-            init=params.Initialization.Imu,
-            dewarp=params.Dewarp.Imu,
-            pseudo_planar_epsilon=0.0,
-            use_plane_to_plane=False,
-            features=[params.Feature.Planar],
-        ),
+        # params.ExperimentParams(
+        #     name="cv_init",
+        #     dataset=dataset,
+        #     init=params.Initialization.ConstantVelocity,
+        #     dewarp=params.Dewarp.Identity,
+        #     pseudo_planar_epsilon=0.0,
+        #     use_plane_to_plane=False,
+        #     features=[params.Feature.Planar],
+        # ),
+        # params.ExperimentParams(
+        #     name="imu_dewarp",
+        #     dataset=dataset,
+        #     init=params.Initialization.Imu,
+        #     dewarp=params.Dewarp.Imu,
+        #     pseudo_planar_epsilon=0.0,
+        #     use_plane_to_plane=False,
+        #     features=[params.Feature.Planar],
+        # ),
     ]
 
     directory = Path("results/25.02.13_imu_init_again")
@@ -328,5 +329,4 @@ if __name__ == "__main__":
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
-        for ep in eps[-1:]:
-            run(ep, directory, visualize=False, length=length)
+        run(eps[0], directory, visualize=False, length=length)
