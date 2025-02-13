@@ -3,13 +3,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, cast
 
+from evalio.datasets.base import Dataset, EVALIO_DATA
 import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
 from serde.yaml import to_yaml
 
 import loam
-from evalio.types import SE3, LidarMeasurement, Stamp, Trajectory
+from evalio.types import SE3, SO3, LidarMeasurement, Stamp, Trajectory
 from params import ExperimentParams
 
 import os
@@ -86,6 +87,30 @@ def plt_show(filename: str | Path):
 
 
 @dataclass
+class NavState:
+    stamp: Stamp
+    pose: SE3
+    velocity: np.ndarray
+
+    # gtsam doesn't expose this function... sigh
+    def update(
+        self, accel: np.ndarray, gyro: np.ndarray, gravity: np.ndarray, stamp: Stamp
+    ) -> None:
+        rot_og = self.pose.rot
+        trans_og = self.pose.trans
+
+        dt = stamp - self.stamp
+        rot = rot_og * SO3.exp(gyro * dt)
+        vel = self.velocity + (rot_og.rotate(accel) + gravity) * dt
+        trans = trans_og + vel * dt + 0.5 * (rot_og.rotate(accel) + gravity) * dt**2
+
+        self.stamp = stamp
+        self.pose = SE3(rot=rot, trans=trans)
+        self.velocity = vel
+        self.trans = trans
+
+
+@dataclass
 class GroundTruthIterator:
     traj: Trajectory
     idx: int = 0
@@ -107,6 +132,52 @@ class GroundTruthIterator:
             return None
         else:
             return self.traj.poses[self.idx]
+
+
+class ImuPoseLoader:
+    def __init__(self, dataset: Dataset) -> None:
+        import pickle
+
+        filename = (
+            EVALIO_DATA / dataset.name() / dataset.seq / "imu_integration_results.pkl"
+        )
+        self.imu_T_lidar = dataset.imu_T_lidar()
+
+        with open(filename, "rb") as f:
+            self.data: list[tuple[Stamp, list[NavState]]] = pickle.load(f)
+        self.idx = 1
+
+        # Convert everything frames
+        for i in range(len(self.data)):
+            for j in range(len(self.data[i][1])):
+                self.data[i][1][j].pose = self.data[i][1][j].pose * self.imu_T_lidar
+                # TODO: Could rotate velocity, not going to bother for now
+
+    def next(self, stamp: Stamp) -> tuple[Optional[SE3], Optional[list[NavState]]]:
+        # If we've reached the end
+        if self.idx >= len(self.data):
+            return None, None
+        # If our first imu is in the future, we'll have to skip for a bit
+        elif self.data[self.idx][0] > stamp:
+            return None, None
+
+        # Skip until we find the first imu that is after our stamp
+        while self.idx < len(self.data) and self.data[self.idx][0] < stamp:
+            self.idx += 1
+        if self.idx >= len(self.data):
+            return None, None
+
+        # Stamps should be dead on
+        assert self.data[self.idx][0] == stamp, "Stamps don't match in ImuPoseLoader"
+
+        # See how far we integrated across the previous timestamp to get to this one
+        prev_states = self.data[self.idx - 1][1]
+        init = prev_states[0].pose.inverse() * prev_states[-1].pose
+
+        # Get all the integrated poses taken during this lidar scan
+        ival = self.data[self.idx][1]
+
+        return init, ival
 
 
 class Writer:

@@ -27,14 +27,17 @@ class Feature(PrettyPrintEnum):
 
 class Initialization(PrettyPrintEnum):
     GroundTruth = 0
-    ConstantVelocity = 1
-    Identity = 2
+    Imu = 1
+    ConstantVelocity = 2
+    Identity = 3
 
 
 class Dewarp(PrettyPrintEnum):
     Identity = 0
     ConstantVelocity = 1
-    GroundTruth = 2
+    Imu = 2
+    # TODO: Should this be kept?
+    GroundTruth = 3
 
 
 class Curvature(PrettyPrintEnum):

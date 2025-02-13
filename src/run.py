@@ -11,7 +11,7 @@ import params
 from convert import convert
 from evalio.types import SE3, SO3, LidarMeasurement
 from loam import Pose3d
-from wrappers import GroundTruthIterator, Rerun, Writer
+from wrappers import GroundTruthIterator, ImuPoseLoader, Rerun, Writer
 
 
 mutex = Lock()
@@ -46,6 +46,8 @@ def run(
     gt = dataset.ground_truth()
     gt.transform_in_place(dataset.imu_T_lidar())
     gt = GroundTruthIterator(gt)
+    # Load integrated imu data
+    imu = ImuPoseLoader(dataset)
 
     # Create visualizer
     rr = None
@@ -118,11 +120,18 @@ def run(
             prev_gt = curr_gt
             continue
 
+        # get imu init and integrated poses - skip if we don't have it
+        imu_init, imu_poses = imu.next(mm.stamp)
+        if imu_init is None:
+            continue
+
         # Get initialization
         step_gt = prev_gt.inverse() * curr_gt
         match ep.init:
             case params.Initialization.GroundTruth:
                 init = convert(step_gt)
+            case params.Initialization.Imu:
+                init = convert(imu_init)
             case params.Initialization.ConstantVelocity:
                 init = convert(prev_prev_gt.inverse() * prev_gt)
             case params.Initialization.Identity:
@@ -138,6 +147,9 @@ def run(
                 pts = loam.deskewInterpolate(
                     pts, pts_stamps, convert(prev_prev_gt), convert(prev_gt)
                 )
+            case params.Dewarp.Imu:
+                # TODO!
+                pass
             case params.Dewarp.GroundTruth:
                 pts = loam.deskewInterpolate(
                     pts, pts_stamps, convert(prev_gt), convert(curr_gt)
@@ -269,19 +281,20 @@ def run_multithreaded(
 
 if __name__ == "__main__":
     dataset = "multi_campus_2024/ntu_day_02"
+    dataset = "hilti_2022/construction_upper_level_1"
 
     eps = [
-        # params.ExperimentParams(
-        #     name="before_pseudo_plane_0.1",
-        #     dataset=dataset,
-        #     init=params.Initialization.GroundTruth,
-        #     dewarp=params.Dewarp.Identity,
-        #     pseudo_planar_epsilon=0.1,
-        #     use_plane_to_plane=True,
-        #     features=[params.Feature.Planar],
-        # ),
         params.ExperimentParams(
-            name="without_transform",
+            name="id_init",
+            dataset=dataset,
+            init=params.Initialization.Identity,
+            dewarp=params.Dewarp.Identity,
+            pseudo_planar_epsilon=0.0,
+            use_plane_to_plane=False,
+            features=[params.Feature.Planar],
+        ),
+        params.ExperimentParams(
+            name="gt_init",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
@@ -289,11 +302,29 @@ if __name__ == "__main__":
             use_plane_to_plane=False,
             features=[params.Feature.Planar],
         ),
+        params.ExperimentParams(
+            name="cv_init",
+            dataset=dataset,
+            init=params.Initialization.ConstantVelocity,
+            dewarp=params.Dewarp.Identity,
+            pseudo_planar_epsilon=0.0,
+            use_plane_to_plane=False,
+            features=[params.Feature.Planar],
+        ),
+        params.ExperimentParams(
+            name="imu_init",
+            dataset=dataset,
+            init=params.Initialization.Imu,
+            dewarp=params.Dewarp.Identity,
+            pseudo_planar_epsilon=0.0,
+            use_plane_to_plane=False,
+            features=[params.Feature.Planar],
+        ),
     ]
 
-    directory = Path("results/25.02.11_test_ceva_multi_campus_before")
+    directory = Path("results/25.02.13_imu_init")
     length = 500
-    multithreaded = False
+    multithreaded = True
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)

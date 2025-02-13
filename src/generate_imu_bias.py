@@ -1,5 +1,5 @@
 from typing import overload
-from evalio.datasets.base import Dataset
+from evalio.datasets.base import EVALIO_DATA, Dataset
 from evalio.types import (
     ImuMeasurement,
     LidarMeasurement,
@@ -30,33 +30,16 @@ from gtsam.imuBias import ConstantBias  # type: ignore
 from gtsam.symbol_shorthand import X, V, B  # type: ignore
 from tqdm import tqdm
 
+from wrappers import NavState
+
 
 @dataclass(kw_only=True)
 class OptimizationResult:
     stamps: list[Stamp]
-    poses: list[Pose3]
+    poses: list[SE3]
     vel: np.ndarray
     gyro_bias: np.ndarray
     accel_bias: np.ndarray
-
-
-@dataclass
-class NavState:
-    rot: Rot3
-    trans: np.ndarray
-    velocity: np.ndarray
-
-    # gtsam doesn't expose this function... sigh
-    def update(
-        self, accel: np.ndarray, gyro: np.ndarray, gravity: np.ndarray, dt: float
-    ) -> None:
-        rot = self.rot * Rot3.Expmap(gyro * dt)
-        vel = self.velocity + (self.rot.rotate(accel) + gravity) * dt
-        trans = self.trans + vel * dt + 0.5 * (self.rot.rotate(accel) + gravity) * dt**2
-
-        self.rot = rot
-        self.velocity = vel
-        self.trans = trans
 
 
 @overload
@@ -209,7 +192,7 @@ def estimate_biases(
     )
     gyro = biases[:, 3:]
     accel = biases[:, :3]
-    poses = [result.atPose3(X(i)) for i in range(len(gt.stamps))]
+    poses = [convert(result.atPose3(X(i))) for i in range(len(gt.stamps))]
     vel = np.array([result.atVector(V(i)) for i in range(len(gt.stamps))])
 
     max_norm = np.max(np.linalg.norm(biases[:, :3], axis=1))
@@ -227,6 +210,59 @@ def estimate_biases(
     return OptimizationResult(
         stamps=gt.stamps, poses=poses, vel=vel, gyro_bias=gyro, accel_bias=accel
     )
+
+
+def integrate_along_lidarscans(
+    lidar_stamps: list[Stamp],
+    imu_data: list[ImuMeasurement],
+    opt_result: OptimizationResult,
+    gravity: np.ndarray,
+) -> list[tuple[Stamp, list[NavState]]]:
+    results = []
+    imu_idx = 1
+    opt_idx = 0
+    for i, stamp in enumerate(lidar_stamps):
+        # Skip lidar scans if they are before the first optimized pose
+        if stamp < opt_result.stamps[opt_idx]:
+            continue
+
+        # get closest imu data
+        while imu_data[imu_idx].stamp < stamp:
+            imu_idx += 1
+        while opt_result.stamps[opt_idx] - stamp < -1e-2:
+            opt_idx += 1
+
+        # Get initialization
+        init = NavState(
+            stamp=opt_result.stamps[opt_idx],
+            pose=opt_result.poses[opt_idx],
+            velocity=opt_result.vel[opt_idx],
+        )
+        accel_bias = opt_result.accel_bias[opt_idx]
+        gyro_bias = opt_result.gyro_bias[opt_idx]
+
+        next_stamp = (
+            lidar_stamps[i + 1]
+            if i + 1 < len(lidar_stamps)
+            else Stamp.from_sec(stamp.to_sec() + 0.1)
+        )
+
+        # Integrate and save
+        this_results = [deepcopy(init)]
+        while imu_data[imu_idx].stamp < next_stamp:
+            imu = imu_data[imu_idx]
+
+            # Update and save
+            init.update(
+                imu.accel - accel_bias, imu.gyro - gyro_bias, gravity, imu.stamp
+            )
+            this_results.append(deepcopy(init))
+
+            imu_idx += 1
+
+        results.append((stamp, this_results))
+
+    return results
 
 
 def integrate(
@@ -247,9 +283,9 @@ def integrate(
     Need initial pose to kick things off
     """
     state = NavState(
-        rot=opt_result.poses[0].rotation(),
+        stamp=opt_result.stamps[0],
+        pose=opt_result.poses[0],
         velocity=opt_result.vel[0],
-        trans=opt_result.poses[0].translation(),
     )
     bias_idx = 0
     stamps = []
@@ -257,7 +293,6 @@ def integrate(
 
     for i in range(1, len(imu_data)):
         imu = imu_data[i]
-        dt = imu.stamp - imu_data[i - 1].stamp
 
         # Find the bias index
         while (
@@ -271,11 +306,23 @@ def integrate(
         gyro = imu.gyro - opt_result.gyro_bias[bias_idx]
 
         # Update and save
-        state.update(accel, gyro, gravity, dt)
+        state.update(accel, gyro, gravity, imu.stamp)
         results.append(deepcopy(state))
         stamps.append(imu.stamp)
 
     return stamps, results
+
+
+def save_results(dataset: Dataset, results: list[tuple[Stamp, list[NavState]]]):
+    # Save results
+    import pickle
+
+    filename = (
+        EVALIO_DATA / dataset.name() / dataset.seq / "imu_integration_results.pkl"
+    )
+
+    with open(filename, "wb") as f:
+        pickle.dump(results, f)
 
 
 if __name__ == "__main__":
@@ -293,21 +340,46 @@ if __name__ == "__main__":
     # gt.poses = gt.poses[:20]
     # gt.stamps = gt.stamps[:20]
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
-    stamps, results = integrate(imu_data, opt_result, dataset.imu_params().gravity)
+    # stamps, results = integrate(imu_data, opt_result, dataset.imu_params().gravity)
+    integrated_results = integrate_along_lidarscans(
+        lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
+    )
+    save_results(dataset, integrated_results)
 
-    # # plot the poses to double check they seem reasonable
+    # plot the poses to double check they seem reasonable
     # import matplotlib.pyplot as plt
     # from wrappers import plt_show
 
     # fig, ax = plt.subplots(1, 1, layout="constrained")
     # num = 700
-    # x = np.asarray([p.translation()[0] for p in opt_result.poses])[:num]
-    # y = np.asarray([p.translation()[1] for p in opt_result.poses])[:num]
+    # x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
+    # y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
     # ax.plot(x, y, label="Ground Truth")
 
     # x = np.asarray([p.trans[0] for p in results])[: num * 40]
     # y = np.asarray([p.trans[1] for p in results])[: num * 40]
     # # print(results[:10])
     # ax.plot(x, y, label="Integrated")
+    # ax.legend()
+    # plt_show("figures/integrated_poses.png")
+
+    # plot the lidarscans poses to double check they seem reasonable
+    # import matplotlib.pyplot as plt
+    # from wrappers import plt_show
+
+    # fig, ax = plt.subplots(1, 1, layout="constrained")
+    # start = 17
+    # num = 1
+    # x = np.asarray([p.pose.trans[0] for _, scan in integrated_results for p in scan])[
+    #     start * 40 : (start + num) * 40
+    # ]
+    # y = np.asarray([p.pose.trans[1] for _, scan in integrated_results for p in scan])[
+    #     start * 40 : (start + num) * 40
+    # ]
+    # ax.scatter(x, y, label="Integrated")
+
+    # x = np.asarray([p.trans[0] for p in opt_result.poses])[start - 1 : start + num + 1]
+    # y = np.asarray([p.trans[1] for p in opt_result.poses])[start - 1 : start + num + 1]
+    # ax.scatter(x, y, label="Ground Truth")
     # ax.legend()
     # plt_show("figures/integrated_poses.png")
