@@ -17,7 +17,7 @@ import os
 import matplotlib.pyplot as plt
 
 from itertools import chain, combinations
-
+from convert import convert
 import argparse
 import matplotlib
 import seaborn as sns
@@ -147,37 +147,54 @@ class ImuPoseLoader:
             self.data: list[tuple[Stamp, list[NavState]]] = pickle.load(f)
         self.idx = 1
 
-        # Convert everything frames
+        # Convert everything into the lidar frame
         for i in range(len(self.data)):
             for j in range(len(self.data[i][1])):
                 self.data[i][1][j].pose = self.data[i][1][j].pose * self.imu_T_lidar
                 # TODO: Could rotate velocity, not going to bother for now
 
-    def next(self, stamp: Stamp) -> tuple[Optional[SE3], Optional[list[NavState]]]:
+        # Zero everything out so it's relative to the first pose in each sequence
+        for i in range(len(self.data)):
+            start_inv = self.data[i][1][0].pose.inverse()
+            for j in range(len(self.data[i][1])):
+                self.data[i][1][j].pose = start_inv * self.data[i][1][j].pose
+
+    def next(
+        self, stamp: Stamp
+    ) -> tuple[Optional[SE3], Optional[list[float]], Optional[list[loam.Pose3d]]]:
+        """
+        Takes in lidar scan stamp (that should be exactly in our list already)
+
+        Returns:
+            Initialization to that stamp relative to the previous stamp
+            delta t in seconds of IMU measurements relative to the stamp passed in
+            IMU measurement integrated from the nearest GT till the next stamp, all relative to the start and in the lidar frame
+        """
         # If we've reached the end
         if self.idx >= len(self.data):
-            return None, None
+            return None, None, None
         # If our first imu is in the future, we'll have to skip for a bit
         elif self.data[self.idx][0] > stamp:
-            return None, None
+            return None, None, None
 
         # Skip until we find the first imu that is after our stamp
         while self.idx < len(self.data) and self.data[self.idx][0] < stamp:
             self.idx += 1
         if self.idx >= len(self.data):
-            return None, None
+            return None, None, None
 
         # Stamps should be dead on
         assert self.data[self.idx][0] == stamp, "Stamps don't match in ImuPoseLoader"
 
         # See how far we integrated across the previous timestamp to get to this one
         prev_states = self.data[self.idx - 1][1]
-        init = prev_states[0].pose.inverse() * prev_states[-1].pose
+        init = prev_states[-1].pose
 
         # Get all the integrated poses taken during this lidar scan
-        ival = self.data[self.idx][1]
+        poses = [convert(p.pose) for p in self.data[self.idx][1]]
+        stamps = [s.stamp - self.data[self.idx][0] for s in self.data[self.idx][1]]
 
-        return init, ival
+        return init, stamps, poses
 
 
 class Writer:

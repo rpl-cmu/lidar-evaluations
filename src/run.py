@@ -121,8 +121,8 @@ def run(
             continue
 
         # get imu init and integrated poses - skip if we don't have it
-        imu_init, imu_poses = imu.next(mm.stamp)
-        if imu_init is None:
+        imu_init, imu_stamps, imu_poses = imu.next(mm.stamp)
+        if imu_init is None or imu_stamps is None or imu_poses is None:
             continue
 
         # Get initialization
@@ -148,8 +148,7 @@ def run(
                     pts, pts_stamps, convert(prev_prev_gt), convert(prev_gt)
                 )
             case params.Dewarp.Imu:
-                # TODO!
-                pass
+                pts = loam.deskewImu(pts, pts_stamps, imu_poses, imu_stamps)
             case params.Dewarp.GroundTruth:
                 pts = loam.deskewInterpolate(
                     pts, pts_stamps, convert(prev_gt), convert(curr_gt)
@@ -312,22 +311,22 @@ if __name__ == "__main__":
             features=[params.Feature.Planar],
         ),
         params.ExperimentParams(
-            name="imu_init",
+            name="imu_dewarp",
             dataset=dataset,
             init=params.Initialization.Imu,
-            dewarp=params.Dewarp.Identity,
+            dewarp=params.Dewarp.Imu,
             pseudo_planar_epsilon=0.0,
             use_plane_to_plane=False,
             features=[params.Feature.Planar],
         ),
     ]
 
-    directory = Path("results/25.02.13_imu_init")
+    directory = Path("results/25.02.13_imu_init_again")
     length = 500
-    multithreaded = True
+    multithreaded = False
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
-        for ep in eps:
+        for ep in eps[-1:]:
             run(ep, directory, visualize=False, length=length)
