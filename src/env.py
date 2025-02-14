@@ -10,7 +10,7 @@ LEN = 3000
 ALL_TRAJ = [
     # ncd20
     "newer_college_2020/01_short_experiment",
-    # "newer_college_2020/02_long_experiment", # todo: needs imu bias
+    "newer_college_2020/02_long_experiment",  # todo: needs imu bias
     # ncd21
     "newer_college_2021/quad-easy",
     "newer_college_2021/quad-medium",
@@ -25,7 +25,7 @@ ALL_TRAJ = [
     "multi_campus_2024/ntu_day_10",
     "multi_campus_2024/tuhh_day_02",
     "multi_campus_2024/tuhh_day_04",
-    # # spires
+    # spires
     "oxford_spires/blenheim_palace_01",
     "oxford_spires/blenheim_palace_02",
     "oxford_spires/blenheim_palace_05",
@@ -35,7 +35,7 @@ ALL_TRAJ = [
     "oxford_spires/keble_college_03",
     "oxford_spires/observatory_quarter_01",
     "oxford_spires/observatory_quarter_02",
-    # # hilti
+    # hilti
     "hilti_2022/construction_upper_level_1",
     "hilti_2022/construction_upper_level_2",
     "hilti_2022/construction_upper_level_3",

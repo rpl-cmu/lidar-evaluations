@@ -11,7 +11,7 @@ from stats import compute_cache_stats
 from run_init import run_multithreaded
 from wrappers import plt_show, parser, setup_plot
 
-dir = RESULTS_DIR / "25.02.14_init"
+dir = RESULTS_DIR / "25.02.14_init_fixed_oxford"
 
 
 def run(num_threads: int):

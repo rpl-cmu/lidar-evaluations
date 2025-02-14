@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, cast
 
-from evalio.datasets.base import Dataset, EVALIO_DATA
+from evalio.datasets.base import Dataset
 import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
@@ -12,6 +12,7 @@ from serde.yaml import to_yaml
 import loam
 from evalio.types import SE3, SO3, LidarMeasurement, Stamp, Trajectory
 from params import ExperimentParams
+from env import INC_DATA_DIR
 
 import os
 import matplotlib.pyplot as plt
@@ -138,8 +139,10 @@ class ImuPoseLoader:
     def __init__(self, dataset: Dataset) -> None:
         import pickle
 
+        self.seq = dataset.seq
+
         filename = (
-            EVALIO_DATA / dataset.name() / dataset.seq / "imu_integration_results.pkl"
+            INC_DATA_DIR / "imu_integration" / f"{dataset.name()}_{dataset.seq}.pkl"
         )
         self.imu_T_lidar = dataset.imu_T_lidar()
 
@@ -184,7 +187,9 @@ class ImuPoseLoader:
             return None, None, None
 
         # Stamps should be dead on
-        assert self.data[self.idx][0] == stamp, "Stamps don't match in ImuPoseLoader"
+        assert self.data[self.idx][0] == stamp, (
+            f"Stamps don't match in ImuPoseLoader in {self.seq}"
+        )
 
         # See how far we integrated across the previous timestamp to get to this one
         prev_states = self.data[self.idx - 1][1]

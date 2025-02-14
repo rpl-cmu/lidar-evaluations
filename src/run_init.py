@@ -235,17 +235,7 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    datasets = [
-        "oxford_spires/blenheim_palace_01",
-        "oxford_spires/blenheim_palace_02",
-        "oxford_spires/blenheim_palace_05",
-        "oxford_spires/bodleian_library_02",
-        "oxford_spires/christ_church_03",
-        "oxford_spires/keble_college_02",
-        "oxford_spires/keble_college_03",
-        "oxford_spires/observatory_quarter_01",
-        "oxford_spires/observatory_quarter_02",
-    ]
+    datasets = ["hilti_2022/basement_2"]
 
     eps = [
         params.ExperimentParams(
@@ -267,5 +257,4 @@ if __name__ == "__main__":
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
-        for e in eps:
-            run(e, directory, visualize=False, length=length)
+        run(eps[0], directory, visualize=False, length=length)

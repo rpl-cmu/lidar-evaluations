@@ -1,5 +1,5 @@
 from typing import overload
-from evalio.datasets.base import EVALIO_DATA, Dataset
+from evalio.datasets.base import Dataset
 from evalio.types import (
     ImuMeasurement,
     LidarMeasurement,
@@ -30,9 +30,8 @@ from gtsam.imuBias import ConstantBias  # type: ignore
 from gtsam.symbol_shorthand import X, V, B  # type: ignore
 from tqdm import tqdm
 
+from env import ALL_TRAJ, INC_DATA_DIR
 from wrappers import NavState
-
-from multiprocessing import Manager, Pool
 
 
 @dataclass(kw_only=True)
@@ -73,22 +72,23 @@ def convert(value: Pose3 | SE3) -> Pose3 | SE3:
 
 
 # returns imu measurements, lidar stamps, and ground truth
-def load_data(
-    dataset: Dataset, multithreaded: bool = False
-) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
+def load_data(dataset: Dataset) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
     # Get ground truth (already in IMU frame)
     gt = dataset.ground_truth()
 
     # Gather all imu data
     imu_data: list[ImuMeasurement] = []
     lidar_stamps = []
-    for mm in tqdm(
-        dataset, disable=multithreaded, desc=f"{dataset.name()} / {dataset.seq}"
-    ):
+    for mm in tqdm(dataset, leave=False, desc=f"{dataset.name()}/{dataset.seq}"):
         if isinstance(mm, ImuMeasurement):
             imu_data.append(mm)
         elif isinstance(mm, LidarMeasurement):
             lidar_stamps.append(mm.stamp)
+
+    lidar_rate = len(lidar_stamps) / (lidar_stamps[-1] - lidar_stamps[0])
+    imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp)
+    print("----Lidar rate:", lidar_rate)
+    print("----Imu rate:", imu_rate)
 
     return imu_data, lidar_stamps, gt
 
@@ -151,7 +151,7 @@ def estimate_biases(
     graph.addPriorVector(V(0), np.zeros(3), vel_noise)
     graph.addPriorConstantBias(B(0), bias0, bias_noise)
 
-    imu_idx = 0
+    imu_idx = 1
     gt_idx = 1
     done = False
     while not done:
@@ -160,7 +160,7 @@ def estimate_biases(
             continue
 
         if imu_data[imu_idx].stamp < gt.stamps[gt_idx]:
-            dt = imu_data[imu_idx + 1].stamp - imu_data[imu_idx].stamp
+            dt = imu_data[imu_idx].stamp - imu_data[imu_idx - 1].stamp
             pim.integrateMeasurement(
                 imu_data[imu_idx].accel, imu_data[imu_idx].gyro, dt
             )
@@ -202,16 +202,7 @@ def estimate_biases(
 
     max_norm = np.max(np.linalg.norm(biases[:, :3], axis=1))
     # assert max_norm < 1.0, f"Max accel bias norm is too large: {max_norm}"
-    print(f"Max accel bias norm is {max_norm}")
-
-    # import matplotlib.pyplot as plt
-    # from wrappers import plt_show
-
-    # fig, ax = plt.subplots(3, 2, layout="constrained")
-    # for i in range(3):
-    #     ax[i, 0].plot(gyro[:, i])
-    #     ax[i, 1].plot(accel[:, i])
-    # plt_show("figures/biases.png")
+    print(f"----Max accel bias norm is {max_norm}")
 
     return OptimizationResult(
         stamps=stamps,
@@ -330,155 +321,75 @@ def save_results(dataset: Dataset, results: list[tuple[Stamp, list[NavState]]]):
     # Save results
     import pickle
 
-    filename = (
-        EVALIO_DATA / dataset.name() / dataset.seq / "imu_integration_results.pkl"
-    )
+    dir = INC_DATA_DIR / "imu_integration"
+    dir.mkdir(parents=True, exist_ok=True)
+
+    filename = dir / f"{dataset.name()}_{dataset.seq}.pkl"
 
     with open(filename, "wb") as f:
         pickle.dump(results, f)
 
 
-def run(name: str, multithreaded: bool = False, force: bool = False):
+def run(name: str, force: bool = False):
     print("Running", name)
     dataset = DatasetBuilder.parse(name)[0].build()
-    filename = (
-        EVALIO_DATA / dataset.name() / dataset.seq / "imu_integration_results.pkl"
-    )
+
+    # Check if it's already been run
+    dir = INC_DATA_DIR / "imu_integration"
+    dir.mkdir(parents=True, exist_ok=True)
+    filename = dir / f"{dataset.name()}_{dataset.seq}.pkl"
     if not force and filename.exists():
-        print("Skipping", name)
+        print("----Skipping")
+        print()
         return
 
-    imu_data, lidar_stamps, gt = load_data(dataset, multithreaded)
+    # run!
+    imu_data, lidar_stamps, gt = load_data(dataset)
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
     integrated_results = integrate_along_lidarscans(
         lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
     )
     save_results(dataset, integrated_results)
-    print("Finished", name)
+    print("----Done")
     print()
 
 
+def test(name: str):
+    dataset = DatasetBuilder.parse(name)[0].build()
+    imu_data, lidar_stamps, gt = load_data(dataset)
+    opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
+    results = integrate_entire_trajectory(
+        imu_data, opt_result, dataset.imu_params().gravity
+    )
+
+    import matplotlib.pyplot as plt
+    from wrappers import plt_show
+
+    fig, ax = plt.subplots(3, 2, layout="constrained")
+    for i in range(3):
+        ax[i, 0].plot(opt_result.gyro_bias[:, i])
+        ax[i, 1].plot(opt_result.accel_bias[:, i])
+    plt_show("figures/biases.png")
+
+    # plot the poses to double check they seem reasonable
+    fig, ax = plt.subplots(1, 1, layout="constrained")
+    num = 10
+    x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
+    y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
+    ax.scatter(x, y, s=1, alpha=0.5, label="Ground Truth")
+
+    x = np.asarray([p.pose.trans[0] for p in results])[: num * 40]
+    y = np.asarray([p.pose.trans[1] for p in results])[: num * 40]
+
+    ax.scatter(x, y, s=1, alpha=0.5, label="Integrated")
+    ax.legend()
+    plt_show("figures/integrated_poses.png")
+
+
 if __name__ == "__main__":
-    datasets = [
-        # ncd20
-        # "newer_college_2020/01_short_experiment",
-        # ncd21
-        # "newer_college_2021/quad-easy",
-        # "newer_college_2021/quad-medium",
-        # "newer_college_2021/quad-hard",
-        # "newer_college_2021/stairs",
-        # "newer_college_2021/cloister",
-        # "newer_college_2021/maths-easy",
-        # "newer_college_2021/maths-medium",
-        # "newer_college_2021/maths-hard",
-        # mcd
-        # "multi_campus_2024/ntu_day_02",  # TODO: Not sure if I've got these working yet
-        # "multi_campus_2024/ntu_day_10",
-        # "multi_campus_2024/tuhh_day_02",
-        # "multi_campus_2024/tuhh_day_04",
-        # # spires
-        "oxford_spires/blenheim_palace_01",
-        # "oxford_spires/blenheim_palace_02",
-        # "oxford_spires/blenheim_palace_05",
-        # "oxford_spires/bodleian_library_02",
-        # "oxford_spires/christ_church_03",
-        # "oxford_spires/keble_college_02",
-        # "oxford_spires/keble_college_03",
-        # "oxford_spires/observatory_quarter_01",
-        # "oxford_spires/observatory_quarter_02",
-        # # hilti
-        # "hilti_2022/construction_upper_level_1",
-        # "hilti_2022/construction_upper_level_2",
-        # "hilti_2022/construction_upper_level_3",
-        # "hilti_2022/basement_2",
-        # "hilti_2022/attic_to_upper_gallery_2",
-        # "hilti_2022/corridor_lower_gallery_2",
-    ]
+    # run("hilti_2022/basement_2", force=True)
+    # test("hilti_2022/basement_2")
+    # quit()
 
-    # num_threads = 2
-
-    # manager = Manager()
-    # shared_list = manager.list([False for _ in range(num_threads)])
-    # lock = manager.Lock()
-
-    # with Pool(num_threads, initargs=(lock,), initializer=tqdm.set_lock) as p:
-    #     for _ in tqdm(
-    #         p.imap_unordered(
-    #             run,
-    #             datasets,
-    #         ),
-    #         total=len(datasets),
-    #         position=0,
-    #         desc="Experiments",
-    #         leave=True,
-    #         dynamic_ncols=True,
-    #     ):
-    #         pass
-
-    for d in datasets:
-        run(d, force=True)
-
-
-# if __name__ == "__main__":
-#     testing = False
-
-#     # Create a dataset
-#     # double checked gravity
-#     name = "newer_college_2020/01_short_experiment"
-
-#     # TODO: This one looks bad
-#     dataset = DatasetBuilder.parse(name)[0].build()
-
-#     imu_data, lidar_stamps, gt = load_data(dataset)
-#     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
-
-#     # Check locally that it's integrating over the first sample decently
-#     if testing:
-#         results = integrate_entire_trajectory(
-#             imu_data, opt_result, dataset.imu_params().gravity
-#         )
-
-#         # plot the poses to double check they seem reasonable
-#         import matplotlib.pyplot as plt
-#         from wrappers import plt_show
-
-#         fig, ax = plt.subplots(1, 1, layout="constrained")
-#         num = 10
-#         x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
-#         y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
-#         ax.scatter(x, y, label="Ground Truth")
-
-#         x = np.asarray([p.pose.trans[0] for p in results])[: num * 40]
-#         y = np.asarray([p.pose.trans[1] for p in results])[: num * 40]
-
-#         ax.scatter(x, y, label="Integrated")
-#         ax.legend()
-#         plt_show("figures/integrated_poses.png")
-#         print("Plotted!")
-
-#     else:
-#         integrated_results = integrate_along_lidarscans(
-#             lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
-#         )
-#         save_results(dataset, integrated_results)
-
-#     # plot the lidarscans poses to double check they seem reasonable
-#     # import matplotlib.pyplot as plt
-#     # from wrappers import plt_show
-
-#     # fig, ax = plt.subplots(1, 1, layout="constrained")
-#     # start = 17
-#     # num = 1
-#     # x = np.asarray([p.pose.trans[0] for _, scan in integrated_results for p in scan])[
-#     #     start * 40 : (start + num) * 40
-#     # ]
-#     # y = np.asarray([p.pose.trans[1] for _, scan in integrated_results for p in scan])[
-#     #     start * 40 : (start + num) * 40
-#     # ]
-#     # ax.scatter(x, y, label="Integrated")
-
-#     # x = np.asarray([p.trans[0] for p in opt_result.poses])[start - 1 : start + num + 1]
-#     # y = np.asarray([p.trans[1] for p in opt_result.poses])[start - 1 : start + num + 1]
-#     # ax.scatter(x, y, label="Ground Truth")
-#     # ax.legend()
-#     # plt_show("figures/integrated_poses.png")
+    for name in ALL_TRAJ:
+        run(name, force=False)
