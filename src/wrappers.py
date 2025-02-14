@@ -207,13 +207,20 @@ class Writer:
         params = "# " + to_yaml(ep).replace("\n", "\n# ")
         self.file.write(params + "\n")
         self.file.write(
-            "# timestamp, x, y, z, qx, qy, qz, qw, gt_x, gt_y, gt_z, gt_qx, gt_qy, gt_qz, gt_qw, point, edge, planar\n"
+            "# timestamp, x, y, z, qx, qy, qz, qw, gt_x, gt_y, gt_z, gt_qx, gt_qy, gt_qz, gt_qw, point, edge, planar, iter\n"
         )
         self.writer = csv.writer(self.file)
 
         self.debug = open(debug, "w")
 
-    def write(self, stamp: Stamp, pose: SE3, gt: SE3, feats: loam.LoamFeatures):
+    def write(
+        self,
+        stamp: Stamp,
+        pose: SE3,
+        gt: SE3,
+        feats: loam.LoamFeatures,
+        detail: loam.RegistrationDetail,
+    ):
         self.writer.writerow(
             [
                 stamp.to_sec(),
@@ -234,6 +241,7 @@ class Writer:
                 len(feats.point_points),
                 len(feats.edge_points),
                 len(feats.planar_points),
+                len(detail.iteration_info),
             ]
         )
 

@@ -13,14 +13,46 @@ from stats import compute_cache_stats
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
-dir = Path("results/25.02.13_ncd21_imu_dewarp_doubled_gyro")
-dir = Path("results/25.02.13_multi_imu_dewarp")
+dir = Path("results/25.02.13_dewarp_large_experiment")
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    datasets = ["newer_college_2021/quad-easy"]
-    datasets = ["multi_campus_2024/tuhh_day_04"]
+    datasets = [
+        # ncd20
+        "newer_college_2020/01_short_experiment",
+        # ncd21
+        "newer_college_2021/quad-easy",
+        "newer_college_2021/quad-medium",
+        "newer_college_2021/quad-hard",
+        "newer_college_2021/stairs",
+        "newer_college_2021/cloister",
+        "newer_college_2021/maths-easy",
+        "newer_college_2021/maths-medium",
+        "newer_college_2021/maths-hard",
+        # mcd
+        "multi_campus_2024/ntu_day_02",  # TODO: Not sure if I've got these working yet
+        "multi_campus_2024/ntu_day_10",
+        "multi_campus_2024/tuhh_day_02",
+        "multi_campus_2024/tuhh_day_04",
+        # spires
+        # "oxford_spires/blenheim_palace_01",
+        # "oxford_spires/blenheim_palace_02",
+        # "oxford_spires/blenheim_palace_05",
+        # "oxford_spires/bodleian_library_02",
+        # "oxford_spires/christ_church_03",
+        # "oxford_spires/keble_college_02",
+        # "oxford_spires/keble_college_03",
+        # "oxford_spires/observatory_quarter_01",
+        # "oxford_spires/observatory_quarter_02",
+        # hilti
+        "hilti_2022/construction_upper_level_1",
+        "hilti_2022/construction_upper_level_2",
+        "hilti_2022/construction_upper_level_3",
+        "hilti_2022/basement_2",
+        "hilti_2022/attic_to_upper_gallery_2",
+        "hilti_2022/corridor_lower_gallery_2",
+    ]
 
     dewarp = [
         Dewarp.Identity,

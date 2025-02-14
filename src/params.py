@@ -122,7 +122,8 @@ class ExperimentParams:
             else:
                 return f[:1]
 
-        ds, seq = self.dataset.split("/")
+        temp = self.dataset.replace("-", "_")
+        ds, seq = temp.split("/")
         ds = (
             "".join(short(d) for d in ds.split("_"))
             + "/"

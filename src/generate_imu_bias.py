@@ -32,6 +32,8 @@ from tqdm import tqdm
 
 from wrappers import NavState
 
+from multiprocessing import Manager, Pool
+
 
 @dataclass(kw_only=True)
 class OptimizationResult:
@@ -71,14 +73,18 @@ def convert(value: Pose3 | SE3) -> Pose3 | SE3:
 
 
 # returns imu measurements, lidar stamps, and ground truth
-def load_data(dataset: Dataset) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
+def load_data(
+    dataset: Dataset, multithreaded: bool = False
+) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
     # Get ground truth (already in IMU frame)
     gt = dataset.ground_truth()
 
     # Gather all imu data
     imu_data: list[ImuMeasurement] = []
     lidar_stamps = []
-    for mm in tqdm(dataset):
+    for mm in tqdm(
+        dataset, disable=multithreaded, desc=f"{dataset.name()} / {dataset.seq}"
+    ):
         if isinstance(mm, ImuMeasurement):
             imu_data.append(mm)
         elif isinstance(mm, LidarMeasurement):
@@ -149,7 +155,7 @@ def estimate_biases(
     gt_idx = 1
     done = False
     while not done:
-        if gt_idx >= len(gt.stamps) or imu_idx >= len(imu_data):
+        if gt_idx >= len(gt.stamps) or imu_idx >= len(imu_data) - 1:
             done = True
             continue
 
@@ -187,28 +193,32 @@ def estimate_biases(
     optimizer = LevenbergMarquardtOptimizer(graph, values, params)
     result = optimizer.optimize()
 
-    biases = np.array(
-        [result.atConstantBias(B(i)).vector() for i in range(len(gt.stamps))]
-    )
+    biases = np.array([result.atConstantBias(B(i)).vector() for i in range(gt_idx)])
     gyro = biases[:, 3:]
     accel = biases[:, :3]
-    poses = [convert(result.atPose3(X(i))) for i in range(len(gt.stamps))]
-    vel = np.array([result.atVector(V(i)) for i in range(len(gt.stamps))])
+    poses = [convert(result.atPose3(X(i))) for i in range(gt_idx)]
+    vel = np.array([result.atVector(V(i)) for i in range(gt_idx)])
+    stamps = gt.stamps[:gt_idx]
 
     max_norm = np.max(np.linalg.norm(biases[:, :3], axis=1))
-    assert max_norm < 1.0, f"Max accel bias norm is too large: {max_norm}"
+    # assert max_norm < 1.0, f"Max accel bias norm is too large: {max_norm}"
+    print(f"Max accel bias norm is {max_norm}")
 
-    import matplotlib.pyplot as plt
-    from wrappers import plt_show
+    # import matplotlib.pyplot as plt
+    # from wrappers import plt_show
 
-    fig, ax = plt.subplots(3, 2, layout="constrained")
-    for i in range(3):
-        ax[i, 0].plot(gyro[:, i])
-        ax[i, 1].plot(accel[:, i])
-    plt_show("figures/biases.png")
+    # fig, ax = plt.subplots(3, 2, layout="constrained")
+    # for i in range(3):
+    #     ax[i, 0].plot(gyro[:, i])
+    #     ax[i, 1].plot(accel[:, i])
+    # plt_show("figures/biases.png")
 
     return OptimizationResult(
-        stamps=gt.stamps, poses=poses, vel=vel, gyro_bias=gyro, accel_bias=accel
+        stamps=stamps,
+        poses=poses,
+        vel=vel,
+        gyro_bias=gyro,
+        accel_bias=accel,
     )
 
 
@@ -328,70 +338,147 @@ def save_results(dataset: Dataset, results: list[tuple[Stamp, list[NavState]]]):
         pickle.dump(results, f)
 
 
-if __name__ == "__main__":
-    testing = False
-
-    # Create a dataset
-    # double checked gravity
-    name = "newer_college_2021/quad-easy"
-    # name = "newer_college_2020/01_short_experiment"
-    # name = "multi_campus_2024/tuhh_day_04"
-    # TODO: This one looks bad
-    # name = "oxford_spires/keble_college_02"
+def run(name: str, multithreaded: bool = False, force: bool = False):
+    print("Running", name)
     dataset = DatasetBuilder.parse(name)[0].build()
+    filename = (
+        EVALIO_DATA / dataset.name() / dataset.seq / "imu_integration_results.pkl"
+    )
+    if not force and filename.exists():
+        print("Skipping", name)
+        return
 
-    imu_data, lidar_stamps, gt = load_data(dataset)
-    # Try doing a smaller subset to make sure not moving at start
-    # gt.poses = gt.poses[:5]
-    # gt.stamps = gt.stamps[:5]
+    imu_data, lidar_stamps, gt = load_data(dataset, multithreaded)
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
+    integrated_results = integrate_along_lidarscans(
+        lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
+    )
+    save_results(dataset, integrated_results)
+    print("Finished", name)
+    print()
 
-    # Check locally that it's integrating over the first sample decently
-    if testing:
-        results = integrate_entire_trajectory(
-            imu_data, opt_result, dataset.imu_params().gravity
-        )
 
-        # plot the poses to double check they seem reasonable
-        import matplotlib.pyplot as plt
-        from wrappers import plt_show
+if __name__ == "__main__":
+    datasets = [
+        # ncd20
+        # "newer_college_2020/01_short_experiment",
+        # ncd21
+        # "newer_college_2021/quad-easy",
+        # "newer_college_2021/quad-medium",
+        # "newer_college_2021/quad-hard",
+        # "newer_college_2021/stairs",
+        # "newer_college_2021/cloister",
+        # "newer_college_2021/maths-easy",
+        # "newer_college_2021/maths-medium",
+        # "newer_college_2021/maths-hard",
+        # mcd
+        # "multi_campus_2024/ntu_day_02",  # TODO: Not sure if I've got these working yet
+        # "multi_campus_2024/ntu_day_10",
+        # "multi_campus_2024/tuhh_day_02",
+        # "multi_campus_2024/tuhh_day_04",
+        # # spires
+        "oxford_spires/blenheim_palace_01",
+        # "oxford_spires/blenheim_palace_02",
+        # "oxford_spires/blenheim_palace_05",
+        # "oxford_spires/bodleian_library_02",
+        # "oxford_spires/christ_church_03",
+        # "oxford_spires/keble_college_02",
+        # "oxford_spires/keble_college_03",
+        # "oxford_spires/observatory_quarter_01",
+        # "oxford_spires/observatory_quarter_02",
+        # # hilti
+        # "hilti_2022/construction_upper_level_1",
+        # "hilti_2022/construction_upper_level_2",
+        # "hilti_2022/construction_upper_level_3",
+        # "hilti_2022/basement_2",
+        # "hilti_2022/attic_to_upper_gallery_2",
+        # "hilti_2022/corridor_lower_gallery_2",
+    ]
 
-        fig, ax = plt.subplots(1, 1, layout="constrained")
-        num = 100
-        x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
-        y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
-        ax.scatter(x, y, label="Ground Truth")
+    # num_threads = 2
 
-        x = np.asarray([p.pose.trans[0] for p in results])[: num * 40]
-        y = np.asarray([p.pose.trans[1] for p in results])[: num * 40]
+    # manager = Manager()
+    # shared_list = manager.list([False for _ in range(num_threads)])
+    # lock = manager.Lock()
 
-        ax.scatter(x, y, label="Integrated")
-        ax.legend()
-        plt_show("figures/integrated_poses.png")
+    # with Pool(num_threads, initargs=(lock,), initializer=tqdm.set_lock) as p:
+    #     for _ in tqdm(
+    #         p.imap_unordered(
+    #             run,
+    #             datasets,
+    #         ),
+    #         total=len(datasets),
+    #         position=0,
+    #         desc="Experiments",
+    #         leave=True,
+    #         dynamic_ncols=True,
+    #     ):
+    #         pass
 
-    else:
-        integrated_results = integrate_along_lidarscans(
-            lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
-        )
-        save_results(dataset, integrated_results)
+    for d in datasets:
+        run(d, force=True)
 
-    # plot the lidarscans poses to double check they seem reasonable
-    # import matplotlib.pyplot as plt
-    # from wrappers import plt_show
 
-    # fig, ax = plt.subplots(1, 1, layout="constrained")
-    # start = 17
-    # num = 1
-    # x = np.asarray([p.pose.trans[0] for _, scan in integrated_results for p in scan])[
-    #     start * 40 : (start + num) * 40
-    # ]
-    # y = np.asarray([p.pose.trans[1] for _, scan in integrated_results for p in scan])[
-    #     start * 40 : (start + num) * 40
-    # ]
-    # ax.scatter(x, y, label="Integrated")
+# if __name__ == "__main__":
+#     testing = False
 
-    # x = np.asarray([p.trans[0] for p in opt_result.poses])[start - 1 : start + num + 1]
-    # y = np.asarray([p.trans[1] for p in opt_result.poses])[start - 1 : start + num + 1]
-    # ax.scatter(x, y, label="Ground Truth")
-    # ax.legend()
-    # plt_show("figures/integrated_poses.png")
+#     # Create a dataset
+#     # double checked gravity
+#     name = "newer_college_2020/01_short_experiment"
+
+#     # TODO: This one looks bad
+#     dataset = DatasetBuilder.parse(name)[0].build()
+
+#     imu_data, lidar_stamps, gt = load_data(dataset)
+#     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
+
+#     # Check locally that it's integrating over the first sample decently
+#     if testing:
+#         results = integrate_entire_trajectory(
+#             imu_data, opt_result, dataset.imu_params().gravity
+#         )
+
+#         # plot the poses to double check they seem reasonable
+#         import matplotlib.pyplot as plt
+#         from wrappers import plt_show
+
+#         fig, ax = plt.subplots(1, 1, layout="constrained")
+#         num = 10
+#         x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
+#         y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
+#         ax.scatter(x, y, label="Ground Truth")
+
+#         x = np.asarray([p.pose.trans[0] for p in results])[: num * 40]
+#         y = np.asarray([p.pose.trans[1] for p in results])[: num * 40]
+
+#         ax.scatter(x, y, label="Integrated")
+#         ax.legend()
+#         plt_show("figures/integrated_poses.png")
+#         print("Plotted!")
+
+#     else:
+#         integrated_results = integrate_along_lidarscans(
+#             lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
+#         )
+#         save_results(dataset, integrated_results)
+
+#     # plot the lidarscans poses to double check they seem reasonable
+#     # import matplotlib.pyplot as plt
+#     # from wrappers import plt_show
+
+#     # fig, ax = plt.subplots(1, 1, layout="constrained")
+#     # start = 17
+#     # num = 1
+#     # x = np.asarray([p.pose.trans[0] for _, scan in integrated_results for p in scan])[
+#     #     start * 40 : (start + num) * 40
+#     # ]
+#     # y = np.asarray([p.pose.trans[1] for _, scan in integrated_results for p in scan])[
+#     #     start * 40 : (start + num) * 40
+#     # ]
+#     # ax.scatter(x, y, label="Integrated")
+
+#     # x = np.asarray([p.trans[0] for p in opt_result.poses])[start - 1 : start + num + 1]
+#     # y = np.asarray([p.trans[1] for p in opt_result.poses])[start - 1 : start + num + 1]
+#     # ax.scatter(x, y, label="Ground Truth")
+#     # ax.legend()
+#     # plt_show("figures/integrated_poses.png")

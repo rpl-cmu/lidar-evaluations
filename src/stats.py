@@ -57,6 +57,7 @@ class ExperimentResult:
     stamps: list[Stamp]
     poses: list[SE3]
     gt: list[SE3]
+    iters: np.ndarray
     features: dict[Feature, np.ndarray]
 
     def __post_init__(self):
@@ -140,6 +141,7 @@ class ExperimentResult:
             "point",
             "edge",
             "planar",
+            "iter",
         ]
 
         poses = []
@@ -148,13 +150,14 @@ class ExperimentResult:
         points = []
         edges = []
         planars = []
+        iters = []
 
         with open(path) as file:
             metadata_filter = filter(lambda row: row[0] == "#", file)
             metadata_list = [row[1:].strip() for row in metadata_filter]
             metadata_list.pop(-1)
             metadata_str = "\n".join(metadata_list)
-            # remove the header row
+            # remove the header rows
             params = from_yaml(ExperimentParams, metadata_str)
 
             # Load trajectory
@@ -182,13 +185,12 @@ class ExperimentResult:
                 )
                 gt = SE3(gt_r, gt_t)
 
-                if "nsec" not in fieldnames:
-                    stamp = Stamp.from_sec(float(line["sec"]))
-                elif "sec" not in fieldnames:
-                    stamp = Stamp.from_nsec(int(line["nsec"]))
-                else:
-                    stamp = Stamp(sec=int(line["sec"]), nsec=int(line["nsec"]))
+                stamp = Stamp.from_sec(float(line["sec"]))
 
+                this_iter = line["iter"]
+                if this_iter is None:
+                    this_iter = 0
+                iters.append(int(this_iter))
                 points.append(int(line["point"]))
                 edges.append(int(line["edge"]))
                 planars.append(int(line["planar"]))
@@ -201,6 +203,7 @@ class ExperimentResult:
             params=params,
             stamps=stamps,
             poses=poses,
+            iters=np.asarray(iters),
             gt=gts,
             features={
                 Feature.Point: np.asarray(points),
@@ -227,24 +230,29 @@ def eval_dataset(
 
     results = []
     for exp in experiments:
-        window10_rte = exp.windowed_rte(10).mean()
+        # TODO: sse or mean here?
+        # window10_rte = exp.windowed_rte(10).mean()
         window100_rte = exp.windowed_rte(100).mean()
+        window200_rte = exp.windowed_rte(200).mean()
         rte = exp.rte().mean()
         ate = exp.ate().mean()
         r = asdict(exp.params)
         r.update(
             {
-                "w10_RTEt": window10_rte.trans,
-                "w10_RTEr": window10_rte.rot,
+                # "w10_RTEt": window10_rte.trans,
+                # "w10_RTEr": window10_rte.rot,
+                "w200_RTEt": window200_rte.trans,
+                "w200_RTEr": window200_rte.rot,
                 "w100_RTEt": window100_rte.trans,
                 "w100_RTEr": window100_rte.rot,
                 "RTEt": rte.trans,
-                "RTEr": rte.rot,
-                "ATEt": ate.trans,
-                "ATEr": ate.rot,
+                # "RTEr": rte.rot,
+                # "ATEt": ate.trans,
+                # "ATEr": ate.rot,
                 "point": exp.get_feature(Feature.Point).mean(),
                 "edge": exp.get_feature(Feature.Edge).mean(),
                 "planar": exp.get_feature(Feature.Planar).mean(),
+                "iters": exp.iters.mean(),
                 "length": len(exp),
             }
         )

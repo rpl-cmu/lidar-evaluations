@@ -54,11 +54,6 @@ def run(
     if visualize:
         rr = Rerun(to_hide=["pose/points", "pose/features/*"], ip=ip)
 
-    # params
-    lp = convert(dataset.lidar_params())
-    fp = ep.feature_params()
-    rp = ep.registration_params()
-
     # Get length of dataset
     data_iter = iter(dataset)
     if length is None or (length is not None and length > len(data_iter)):  # type:ignore
@@ -96,7 +91,6 @@ def run(
     # Setup everything for running
     idx = 0
 
-    prev_feat = None
     prev_gt = None
     prev_prev_gt = None
 
@@ -106,9 +100,6 @@ def run(
     for mm in data_iter:
         if not isinstance(mm, LidarMeasurement):
             continue
-
-        pts = mm.to_vec_positions()
-        pts_stamps = mm.to_vec_stamps()
 
         # Get ground truth and skip if we don't have all of them
         curr_gt = gt.next(mm.stamp)
@@ -141,47 +132,9 @@ def run(
             case _:
                 raise ValueError("Unknown initialization")
 
-        # Deskew
-        match ep.dewarp:
-            case params.Dewarp.Identity:
-                pass
-            case params.Dewarp.ConstantVelocity:
-                pts = loam.deskewInterpolate(
-                    pts, pts_stamps, convert(prev_prev_gt), convert(prev_gt)
-                )
-            case params.Dewarp.Imu:
-                pts = loam.deskewImu(pts, pts_stamps, imu_poses, imu_stamps)
-            case params.Dewarp.GroundTruth:
-                pts = loam.deskewInterpolate(
-                    pts, pts_stamps, convert(prev_gt), convert(curr_gt)
-                )
-            case _:
-                raise ValueError("Unknown dewarping")
-
-        # Get features and ground truth
-        curr_feat = loam.extractFeatures(pts, lp, fp)
-        if not ep.planar:
-            curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
-            curr_feat.planar_points = []
-        if not ep.edge:
-            curr_feat.point_points = curr_feat.point_points + curr_feat.edge_points
-            curr_feat.edge_points = []
-        if not ep.point:
-            curr_feat.point_points = []
-
-        # Skip if we don't have everything we need
-        if prev_feat is None:
-            prev_feat = curr_feat
-            prev_prev_gt = prev_gt
-            prev_gt = curr_gt
-            continue
-
         try:
             detail = loam.RegistrationDetail()
-            step_pose = loam.registerFeatures(
-                curr_feat, prev_feat, init, params=rp, detail=detail
-            )
-            step_pose = convert(step_pose)
+            step_pose: SE3 = convert(init)  # type: ignore
 
             # Also skipping iter_gt to not compound bad results if failed
             iter_gt = iter_gt * step_gt
@@ -191,7 +144,6 @@ def run(
                 rr.log("gt", iter_gt)
                 rr.log("pose", iter_est)
                 rr.log("pose/points", mm)
-                rr.log("pose/features", curr_feat)
 
                 # compute metrics to send as well
                 delta = step_gt.inverse() * step_pose
@@ -210,7 +162,7 @@ def run(
 
             # Save results
             # Saving deltas for now - maybe switch to trajectories later
-            writer.write(mm.stamp, step_pose, step_gt, curr_feat, detail)
+            writer.write(mm.stamp, step_pose, step_gt, loam.LoamFeatures(), detail)
 
         except Exception as e:
             writer.error("Registration failed, replacing with nan")
@@ -224,7 +176,6 @@ def run(
 
         prev_prev_gt = prev_gt
         prev_gt = curr_gt
-        prev_feat = curr_feat
 
         if length is not None and idx >= length:
             break

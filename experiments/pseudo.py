@@ -12,7 +12,7 @@ from wrappers import parser, plt_show
 from run import run_multithreaded
 from stats import compute_cache_stats
 
-dir = Path("results/25.02.07_pseudo_new_projector")
+dir = Path("results/25.02.14_pseudo_with_imu")
 # dir = Path("results/25.02.10_pseudo_new_projector_tighter_range")
 
 
@@ -28,34 +28,23 @@ def run(num_threads: int):
     init = [
         Initialization.Identity,
         Initialization.ConstantVelocity,
+        Initialization.Imu,
         Initialization.GroundTruth,
     ]
 
-    epsilon = np.linspace(0.00, 0.2, 11)
+    epsilon = np.linspace(0.0, 1.0, 11)
 
     # ------------------------- Computer product of options ------------------------- #
-    experiments_planar = [
-        ExperimentParams(
-            name=f"planar_{i.name}",
-            dataset=d,
-            features=[Feature.Planar],
-            init=i,
-        )
-        for (d, i) in product(datasets, init)
-    ]
-
-    experiments_pseudo = [
+    experiments = [
         ExperimentParams(
             name=f"pseudo_{i.name}_{val:.3f}",
             dataset=d,
-            features=[Feature.Point_Plane],
+            features=[Feature.Planar],
             pseudo_planar_epsilon=float(val),
             init=i,
         )
         for d, i, val in product(datasets, init, epsilon)
     ]
-
-    experiments = experiments_planar + experiments_pseudo
 
     run_multithreaded(experiments, dir, num_threads=num_threads)
 
