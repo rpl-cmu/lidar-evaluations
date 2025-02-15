@@ -10,50 +10,15 @@ from params import ExperimentParams, Feature, Initialization, Dewarp
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
+from env import ALL_TRAJ, RESULTS_DIR
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
-dir = Path("results/25.02.13_dewarp_large_experiment")
+dir = RESULTS_DIR / "25.02.14_dewarp_large_experiment"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    datasets = [
-        # ncd20
-        "newer_college_2020/01_short_experiment",
-        # ncd21
-        "newer_college_2021/quad-easy",
-        "newer_college_2021/quad-medium",
-        "newer_college_2021/quad-hard",
-        "newer_college_2021/stairs",
-        "newer_college_2021/cloister",
-        "newer_college_2021/maths-easy",
-        "newer_college_2021/maths-medium",
-        "newer_college_2021/maths-hard",
-        # mcd
-        "multi_campus_2024/ntu_day_02",  # TODO: Not sure if I've got these working yet
-        "multi_campus_2024/ntu_day_10",
-        "multi_campus_2024/tuhh_day_02",
-        "multi_campus_2024/tuhh_day_04",
-        # spires
-        # "oxford_spires/blenheim_palace_01",
-        # "oxford_spires/blenheim_palace_02",
-        # "oxford_spires/blenheim_palace_05",
-        # "oxford_spires/bodleian_library_02",
-        # "oxford_spires/christ_church_03",
-        # "oxford_spires/keble_college_02",
-        # "oxford_spires/keble_college_03",
-        # "oxford_spires/observatory_quarter_01",
-        # "oxford_spires/observatory_quarter_02",
-        # hilti
-        "hilti_2022/construction_upper_level_1",
-        "hilti_2022/construction_upper_level_2",
-        "hilti_2022/construction_upper_level_3",
-        "hilti_2022/basement_2",
-        "hilti_2022/attic_to_upper_gallery_2",
-        "hilti_2022/corridor_lower_gallery_2",
-    ]
-
     dewarp = [
         Dewarp.Identity,
         Dewarp.ConstantVelocity,
@@ -63,6 +28,7 @@ def run(num_threads: int):
     init = [
         # Initialization.Identity,
         # Initialization.ConstantVelocity,
+        Initialization.Imu,
         Initialization.GroundTruth,
     ]
 
@@ -75,7 +41,7 @@ def run(num_threads: int):
             dewarp=de,
             init=i,
         )
-        for (d, de, i) in product(datasets, dewarp, init)
+        for (d, de, i) in product(ALL_TRAJ, dewarp, init)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads)

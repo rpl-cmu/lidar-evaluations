@@ -61,8 +61,8 @@ def plot(name: str, force: bool):
         y="w100_RTEr",
         hue="dataset",
         style="init",
-        markers=["s", "X", "o"],
-        style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        markers=["s", "X", "o", "P"],
+        style_order=["Identity", "ConstantVelocity", "GroundTruth", "Imu"],
         dashes=False,
     )
     sns.lineplot(
@@ -72,8 +72,8 @@ def plot(name: str, force: bool):
         y="w100_RTEt",
         hue="dataset",
         style="init",
-        markers=["s", "X", "o"],
-        style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        markers=["s", "X", "o", "P"],
+        style_order=["Identity", "ConstantVelocity", "GroundTruth", "Imu"],
         dashes=False,
         legend=False,
     )

@@ -36,8 +36,6 @@ class Dewarp(PrettyPrintEnum):
     Identity = 0
     ConstantVelocity = 1
     Imu = 2
-    # TODO: Should this be kept?
-    GroundTruth = 3
 
 
 class Curvature(PrettyPrintEnum):

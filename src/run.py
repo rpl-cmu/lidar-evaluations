@@ -1,7 +1,7 @@
 from functools import partial
 from multiprocessing import Manager, Pool, Lock
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Optional, Sequence, cast
 
 import numpy as np
 from tqdm import tqdm
@@ -9,7 +9,7 @@ from tqdm import tqdm
 import loam
 import params
 from convert import convert
-from evalio.types import SE3, SO3, LidarMeasurement
+from evalio.types import SE3, SO3, LidarMeasurement, Stamp
 from loam import Pose3d
 from wrappers import GroundTruthIterator, ImuPoseLoader, Rerun, Writer
 
@@ -96,6 +96,7 @@ def run(
     # Setup everything for running
     idx = 0
 
+    prev_stamp = None
     prev_feat = None
     prev_gt = None
     prev_prev_gt = None
@@ -116,10 +117,12 @@ def run(
             continue
         if prev_gt is None:
             prev_gt = curr_gt
+            prev_stamp = mm.stamp
             continue
         if prev_prev_gt is None:
             prev_prev_gt = prev_gt
             prev_gt = curr_gt
+            prev_stamp = mm.stamp
             continue
 
         # get imu init and integrated poses - skip if we don't have it
@@ -146,15 +149,12 @@ def run(
             case params.Dewarp.Identity:
                 pass
             case params.Dewarp.ConstantVelocity:
-                pts = loam.deskewInterpolate(
-                    pts, pts_stamps, convert(prev_prev_gt), convert(prev_gt)
-                )
+                dt = mm.stamp - cast(Stamp, prev_stamp)
+                vel_trans = (prev_gt.trans - prev_prev_gt.trans) / dt
+                vel_rot = (prev_prev_gt.rot.inverse() * prev_gt.rot).log() / dt
+                pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
             case params.Dewarp.Imu:
                 pts = loam.deskewImu(pts, pts_stamps, imu_poses, imu_stamps)
-            case params.Dewarp.GroundTruth:
-                pts = loam.deskewInterpolate(
-                    pts, pts_stamps, convert(prev_gt), convert(curr_gt)
-                )
             case _:
                 raise ValueError("Unknown dewarping")
 
@@ -174,6 +174,7 @@ def run(
             prev_feat = curr_feat
             prev_prev_gt = prev_gt
             prev_gt = curr_gt
+            prev_stamp = mm.stamp
             continue
 
         try:
@@ -224,6 +225,7 @@ def run(
 
         prev_prev_gt = prev_gt
         prev_gt = curr_gt
+        prev_stamp = mm.stamp
         prev_feat = curr_feat
 
         if length is not None and idx >= length:
@@ -284,33 +286,21 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    datasets = [
-        "oxford_spires/blenheim_palace_01",
-        "oxford_spires/blenheim_palace_02",
-        "oxford_spires/blenheim_palace_05",
-        "oxford_spires/bodleian_library_02",
-        "oxford_spires/christ_church_03",
-        "oxford_spires/keble_college_02",
-        "oxford_spires/keble_college_03",
-        "oxford_spires/observatory_quarter_01",
-        "oxford_spires/observatory_quarter_02",
-    ]
+    dataset = "botanic_garden/1005_00"
+    dataset = "hilti_2022/basement_2"
 
     eps = [
         params.ExperimentParams(
-            name="imu",
-            dataset=d,
+            name="fix_cv_removed",
+            dataset=dataset,
             init=params.Initialization.GroundTruth,
-            dewarp=params.Dewarp.Imu,
-            pseudo_planar_epsilon=0.0,
-            use_plane_to_plane=False,
+            dewarp=params.Dewarp.ConstantVelocity,
             features=[params.Feature.Planar],
         )
-        for d in datasets
     ]
 
-    directory = Path("results/25.02.14_broken_imu_dewarp")
-    length = 100
+    directory = Path("results/25.02.14_fix_cv")
+    length = 200
     multithreaded = False
 
     if multithreaded:
