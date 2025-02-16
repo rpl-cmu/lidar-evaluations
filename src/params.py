@@ -7,10 +7,6 @@ import loam
 from evalio.cli.parser import DatasetBuilder
 
 
-def uppers(s: str) -> str:
-    return "".join(c for c in s if c.isupper())
-
-
 class PrettyPrintEnum(Enum):
     def __repr__(self):
         return self.name

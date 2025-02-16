@@ -21,9 +21,14 @@ ALL_TRAJ = [
     "newer_college_2021/maths-medium",
     "newer_college_2021/maths-hard",
     # mcd
+    "multi_campus_2024/ntu_day_01",
     "multi_campus_2024/ntu_day_02",
     "multi_campus_2024/ntu_day_10",
+    "multi_campus_2024/kth_day_06",
+    "multi_campus_2024/kth_day_09",
+    "multi_campus_2024/kth_day_10",
     "multi_campus_2024/tuhh_day_02",
+    "multi_campus_2024/tuhh_day_03",
     "multi_campus_2024/tuhh_day_04",
     # spires
     "oxford_spires/blenheim_palace_01",
@@ -42,6 +47,13 @@ ALL_TRAJ = [
     "hilti_2022/basement_2",
     "hilti_2022/attic_to_upper_gallery_2",
     "hilti_2022/corridor_lower_gallery_2",
+    # helipr
+    "helipr/kaist_05",
+    "helipr/kaist_06",
+    "helipr/dcc_05",
+    "helipr/dcc_06",
+    "helipr/riverside_05",
+    "helipr/riverside_06",
 ]
 
 SUBSET_TRAJ = [

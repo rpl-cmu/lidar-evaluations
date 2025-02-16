@@ -1,4 +1,4 @@
-from typing import overload
+from typing import overload, Optional
 from evalio.datasets.base import Dataset
 from evalio.types import (
     ImuMeasurement,
@@ -13,6 +13,8 @@ from evalio.cli import DatasetBuilder
 import numpy as np
 from dataclasses import dataclass
 from copy import deepcopy
+from pathlib import Path
+import pickle
 
 import gtsam
 from gtsam import (
@@ -30,7 +32,7 @@ from gtsam.imuBias import ConstantBias  # type: ignore
 from gtsam.symbol_shorthand import X, V, B  # type: ignore
 from tqdm import tqdm
 
-from env import ALL_TRAJ, INC_DATA_DIR
+from env import ALL_TRAJ, INC_DATA_DIR, LEN
 from wrappers import NavState
 
 
@@ -72,7 +74,9 @@ def convert(value: Pose3 | SE3) -> Pose3 | SE3:
 
 
 # returns imu measurements, lidar stamps, and ground truth
-def load_data(dataset: Dataset) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
+def load_data(
+    dataset: Dataset, length: Optional[int] = None
+) -> tuple[list[ImuMeasurement], list[Stamp], Trajectory]:
     # Get ground truth (already in IMU frame)
     gt = dataset.ground_truth()
 
@@ -85,9 +89,13 @@ def load_data(dataset: Dataset) -> tuple[list[ImuMeasurement], list[Stamp], Traj
         elif isinstance(mm, LidarMeasurement):
             lidar_stamps.append(mm.stamp)
 
+        # Keep a little fudge room since we skip some stamps at the start
+        if length is not None and len(lidar_stamps) >= length + 100:
+            break
+
     lidar_rate = len(lidar_stamps) / (lidar_stamps[-1] - lidar_stamps[0])
     imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp)
-    print("----Lidar rate:", lidar_rate)
+    print("----Lidar rate:", lidar_rate, len(lidar_stamps))
     print("----Imu rate:", imu_rate)
 
     return imu_data, lidar_stamps, gt
@@ -113,8 +121,11 @@ def estimate_biases(
     avg_w = np.mean(w, axis=0)
     vio_R_x0 = imu0_T_x0.rotation().matrix()
     avg_a = np.mean(a, axis=0)
+
     # Remove gravity from init frame, then back to body frame
     avg_a = vio_R_x0.T @ (vio_R_x0 @ avg_a + imu_params.gravity)
+    avg_a[np.abs(avg_a) > 0.5] = 0.0
+    avg_w[np.abs(avg_w) > 0.2] = 0.0
     bias0 = ConstantBias(avg_a, avg_w)
 
     # Line up both poses
@@ -262,7 +273,7 @@ def integrate_along_lidarscans(
 
         # Integrate
         this_results = [deepcopy(init)]
-        while imu_data[imu_idx].stamp < next_stamp:
+        while imu_idx < len(imu_data) and imu_data[imu_idx].stamp < next_stamp:
             imu = imu_data[imu_idx]
 
             # Update and save
@@ -317,25 +328,12 @@ def integrate_entire_trajectory(
     return results
 
 
-def save_results(dataset: Dataset, results: list[tuple[Stamp, list[NavState]]]):
-    # Save results
-    import pickle
-
-    dir = INC_DATA_DIR / "imu_integration"
-    dir.mkdir(parents=True, exist_ok=True)
-
-    filename = dir / f"{dataset.name()}_{dataset.seq}.pkl"
-
-    with open(filename, "wb") as f:
-        pickle.dump(results, f)
-
-
-def run(name: str, force: bool = False):
+def run(name: str, out_dir: Path, force: bool = False, length: Optional[int] = None):
     print("Running", name)
     dataset = DatasetBuilder.parse(name)[0].build()
 
     # Check if it's already been run
-    dir = INC_DATA_DIR / "imu_integration"
+    dir = out_dir / "imu_integration"
     dir.mkdir(parents=True, exist_ok=True)
     filename = dir / f"{dataset.name()}_{dataset.seq}.pkl"
     if not force and filename.exists():
@@ -344,19 +342,21 @@ def run(name: str, force: bool = False):
         return
 
     # run!
-    imu_data, lidar_stamps, gt = load_data(dataset)
+    imu_data, lidar_stamps, gt = load_data(dataset, length)
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
     integrated_results = integrate_along_lidarscans(
         lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
     )
-    save_results(dataset, integrated_results)
+
+    with open(filename, "wb") as f:
+        pickle.dump(integrated_results, f)
     print("----Done")
     print()
 
 
-def test(name: str):
+def test(name: str, length: Optional[int] = None):
     dataset = DatasetBuilder.parse(name)[0].build()
-    imu_data, lidar_stamps, gt = load_data(dataset)
+    imu_data, lidar_stamps, gt = load_data(dataset, length)
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
     results = integrate_entire_trajectory(
         imu_data, opt_result, dataset.imu_params().gravity
@@ -365,21 +365,32 @@ def test(name: str):
     import matplotlib.pyplot as plt
     from wrappers import plt_show
 
+    # Plot biases to make sure they're changing
     fig, ax = plt.subplots(3, 2, layout="constrained")
+    first_stamp = opt_result.stamps[0]
+    stamps = np.asarray([r - first_stamp for r in opt_result.stamps])
     for i in range(3):
-        ax[i, 0].plot(opt_result.gyro_bias[:, i])
-        ax[i, 1].plot(opt_result.accel_bias[:, i])
+        ax[i, 0].plot(stamps, opt_result.gyro_bias[:, i])
+        ax[i, 1].plot(stamps, opt_result.accel_bias[:, i])
     plt_show("figures/biases.png")
 
-    # plot the poses to double check they seem reasonable
+    # Ballpark how many imu measurements to plot
+    opt_rate = len(opt_result.stamps) / (opt_result.stamps[-1] - opt_result.stamps[0])
+    imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp)
+    diff = int(imu_rate / opt_rate)
+
+    # plot the poses to make imu integration roughly matches trajectory
     fig, ax = plt.subplots(1, 1, layout="constrained")
-    num = 10
+    num = 400
     x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
     y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
     ax.scatter(x, y, s=1, alpha=0.5, label="Ground Truth")
 
-    x = np.asarray([p.pose.trans[0] for p in results])[: num * 40]
-    y = np.asarray([p.pose.trans[1] for p in results])[: num * 40]
+    x = np.asarray([p.pose.trans[0] for p in results])[: num * diff]
+    y = np.asarray([p.pose.trans[1] for p in results])[: num * diff]
+
+    print("imu end:", results[num * diff].stamp)
+    print("opt end:", opt_result.stamps[num])
 
     ax.scatter(x, y, s=1, alpha=0.5, label="Integrated")
     ax.legend()
@@ -391,5 +402,10 @@ if __name__ == "__main__":
     # test("hilti_2022/basement_2")
     # quit()
 
+    out_dir = Path("data_temp")
+
     for name in ALL_TRAJ:
-        run(name, force=False)
+        run(name, out_dir=out_dir, force=False, length=LEN)
+
+    # test("helipr/kaist_05", length=500)
+    # run("helipr/kaist_05", out_dir=out_dir, force=True, length=100)

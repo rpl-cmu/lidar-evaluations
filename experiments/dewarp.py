@@ -10,11 +10,11 @@ from params import ExperimentParams, Feature, Initialization, Dewarp
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
-from env import ALL_TRAJ, RESULTS_DIR
+from env import ALL_TRAJ, LEN, RESULTS_DIR
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
-dir = RESULTS_DIR / "25.02.14_dewarp_large_experiment"
+dir = RESULTS_DIR / "25.02.15_dewarp_with_shorter_bias_opt"
 
 
 def run(num_threads: int):
@@ -44,7 +44,7 @@ def run(num_threads: int):
         for (d, de, i) in product(ALL_TRAJ, dewarp, init)
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads)
+    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
 
 
 def make_plot(df: pl.DataFrame, name: str, to_plot: str):
