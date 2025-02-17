@@ -4,17 +4,18 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
 import sys
+import numpy as np
 
 sys.path.append("src")
 from params import ExperimentParams, Feature, Initialization, Dewarp
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
-from env import ALL_TRAJ, LEN, RESULTS_DIR
+from env import ALL_TRAJ, LEN, RESULTS_DIR, FIGURE_DIR
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
-dir = RESULTS_DIR / "25.02.15_dewarp_with_shorter_bias_opt"
+dir = RESULTS_DIR / "25.02.17_all_dewarp_versions"
 
 
 def run(num_threads: int):
@@ -23,12 +24,13 @@ def run(num_threads: int):
         Dewarp.Identity,
         Dewarp.ConstantVelocity,
         Dewarp.Imu,
+        Dewarp.GroundTruthConstantVelocity,
     ]
 
     init = [
         # Initialization.Identity,
         # Initialization.ConstantVelocity,
-        Initialization.Imu,
+        # Initialization.Imu,
         Initialization.GroundTruth,
     ]
 
@@ -47,42 +49,64 @@ def run(num_threads: int):
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
 
 
-def make_plot(df: pl.DataFrame, name: str, to_plot: str):
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
-    sns.lineplot(
-        df.filter(pl.col("init") == "GroundTruth"),
-        ax=ax[0],
-        x="dewarp",
-        y=f"{to_plot}r",
-        hue="dataset",
-        # style="init",
-        marker="o",
-        sort=True,
-    )
-    sns.lineplot(
-        df.filter(pl.col("init") == "GroundTruth"),
-        ax=ax[1],
-        x="dewarp",
-        y=f"{to_plot}t",
-        hue="dataset",
-        # style="init",
-        marker="o",
-        sort=True,
-        legend=False,
-    )
-    ax[0].legend().set_visible(False)
-    # ax[0].set_ylim(0, 5)
-    fig.legend(ncol=2, loc="outside lower center")
-    plt_show(Path("figures") / f"{name}_{to_plot}.png")
-
-
 def plot(name: str, force: bool):
-    setup_plot()
-    df = compute_cache_stats(dir, force)
-    make_plot(df, name, "RTE")
-    # make_plot(df, name, "w10_RTE")
-    make_plot(df, name, "w100_RTE")
-    # make_plot(df, name, "ATE")
+    df = compute_cache_stats(dir, force=force)
+
+    df = df.filter(pl.col("Initialization") == "GroundTruth")
+    df = df.filter(pl.col("Dewarp") != "GroundTruthConstantVelocity")
+    # df = df.filter(pl.col("Dataset") != "HeLiPR")
+
+    # Get identity versions
+    df_identity = df.filter(pl.col("Dewarp") == "None").select(["dataset", "w100_RTEt"])
+
+    # compute percent improvement
+    df = df.with_columns(percent=pl.zeros(df.shape[0]))
+    for dataset in df["dataset"].unique():
+        id_val = df_identity.filter(pl.col("dataset") == dataset)[0, "w100_RTEt"]
+        df = df.with_columns(
+            percent=pl.when(pl.col("dataset") == dataset)
+            .then(pl.col("w100_RTEt") / id_val)
+            .otherwise(pl.col("percent"))
+        )
+
+    _c = setup_plot()
+    fig, ax = plt.subplots(
+        1, 1, figsize=(5, 3), layout="constrained", sharey=False, sharex=True
+    )
+
+    sns.lineplot(
+        df,
+        ax=ax,
+        x="Trajectory",
+        y="percent",
+        hue="Dataset",
+        style="Dewarp",
+        markers=["s", "X", "o"],
+        style_order=["None", "Constant Velocity", "IMU"],
+        dashes=False,
+        legend=True,
+    )
+    # blank line for the legend
+    ax.plot(np.NaN, np.NaN, "-", color="none", label=" ")
+
+    # Reorder the legend to put blank one in the right spot
+    handles, labels = ax.get_legend_handles_labels()
+    handles.insert(4, handles.pop(-1))
+    labels.insert(4, labels.pop(-1))
+
+    ax.legend().set_visible(False)
+    ax.tick_params(axis="x", pad=-1, rotation=90)
+    ax.tick_params(axis="y", pad=-1)
+
+    ax.set_ylabel("Percent Improvement", labelpad=3)
+
+    fig.legend(
+        handles=handles,
+        labels=labels,
+        ncol=3,
+        loc="outside lower center",
+    )
+    plt_show(FIGURE_DIR / f"{name}.png")
 
 
 if __name__ == "__main__":

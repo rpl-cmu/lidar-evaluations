@@ -150,8 +150,15 @@ def run(
                 pass
             case params.Dewarp.ConstantVelocity:
                 dt = mm.stamp - cast(Stamp, prev_stamp)
-                vel_trans = (prev_gt.trans - prev_prev_gt.trans) / dt
-                vel_rot = (prev_prev_gt.rot.inverse() * prev_gt.rot).log() / dt
+                delta = prev_prev_gt.inverse() * prev_gt
+                vel_trans = delta.trans / dt
+                vel_rot = delta.rot.log() / dt
+                pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
+            case params.Dewarp.GroundTruthConstantVelocity:
+                dt = mm.stamp - cast(Stamp, prev_stamp)
+                delta = prev_gt.inverse() * curr_gt
+                vel_trans = delta.trans / dt
+                vel_rot = delta.rot.log() / dt
                 pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
             case params.Dewarp.Imu:
                 pts = loam.deskewImu(pts, pts_stamps, imu_poses, imu_stamps)
@@ -287,7 +294,6 @@ def run_multithreaded(
 
 if __name__ == "__main__":
     dataset = "botanic_garden/1005_00"
-    dataset = "hilti_2022/basement_2"
 
     eps = [
         params.ExperimentParams(

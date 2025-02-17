@@ -232,10 +232,10 @@ def eval_dataset(
     for exp in experiments:
         # TODO: sse or mean here?
         # window10_rte = exp.windowed_rte(10).mean()
-        window100_rte = exp.windowed_rte(100).mean()
-        window200_rte = exp.windowed_rte(200).mean()
-        rte = exp.rte().mean()
-        ate = exp.ate().mean()
+        window100_rte = exp.windowed_rte(100).sse()
+        window200_rte = exp.windowed_rte(200).sse()
+        rte = exp.rte().sse()
+        # ate = exp.ate().sse()
         r = asdict(exp.params)
         r.update(
             {
@@ -328,6 +328,69 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             d["dewarp"] = d["dewarp"].name
 
         df = pl.DataFrame(all_data)
+
+        # ------------------------- Split dataset and sequences ------------------------- #
+        datasets_pretty_names = {
+            "newer_college_2020": "Newer College Single-Cam",
+            "newer_college_2021": "Newer College Multi-Cam",
+            "hilti_2022": "Hilti 2022",
+            "helipr": "HeLiPR",
+            "oxford_spires": "Oxford Spires",
+            "multi_campus_2024": "Multi-Campus",
+            # "botanic_gardens": "Botanic Gardens",
+        }
+
+        def short(f: str) -> str:
+            if f.isdigit():
+                return f[-2:]
+            else:
+                return f[:1]
+
+        def sequence_pretty_names(seq) -> str:
+            seq = seq.replace("-", "_")
+            return "".join(short(d) for d in seq.split("_"))
+
+        df = (
+            df.lazy()
+            .with_columns(
+                pl.col("dataset")
+                .str.split("/")
+                .list.get(0)
+                .replace_strict(datasets_pretty_names)
+                .alias("Dataset"),
+                pl.col("dataset")
+                .str.split("/")
+                .list.get(1)
+                .map_elements(
+                    lambda seq: sequence_pretty_names(seq), return_dtype=pl.String
+                )
+                .alias("Trajectory"),
+            )
+            .collect()
+        )
+
+        df = df.sort(
+            pl.col("Dataset").cast(pl.Enum(list(datasets_pretty_names.values())))
+        )
+
+        # ------------------------- Cleanup dewarp names ------------------------- #
+        dewarp_pretty_names = {
+            "Identity": "None",
+            "ConstantVelocity": "Constant Velocity",
+            "Imu": "IMU",
+        }
+        df = df.with_columns(
+            pl.col("dewarp").replace(dewarp_pretty_names).alias("Dewarp")
+        )
+
+        # ------------------------- Rename other columns ------------------------- #
+        # convert 100steps -> 10sec
+        df = df.rename(
+            {
+                "init": "Initialization",
+            }
+        )
+
         df.write_csv(df_file)
     else:
         df = pl.read_csv(df_file)
