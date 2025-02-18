@@ -10,7 +10,7 @@ LEN = 3000
 ALL_TRAJ = [
     # ncd20
     "newer_college_2020/01_short_experiment",
-    "newer_college_2020/02_long_experiment",  # todo: needs imu bias
+    "newer_college_2020/02_long_experiment",
     # ncd21
     "newer_college_2021/quad-easy",
     "newer_college_2021/quad-medium",
@@ -54,12 +54,23 @@ ALL_TRAJ = [
     "helipr/dcc_06",
     "helipr/riverside_05",
     "helipr/riverside_06",
+    # botanic garden
+    "botanic_garden/1005_00",
+    "botanic_garden/1005_01",
+    "botanic_garden/1005_07",
+    "botanic_garden/1006_01",
+    "botanic_garden/1008_03",
+    "botanic_garden/1018_00",
+    "botanic_garden/1018_13",
 ]
 
+# TODO: Verify these are the ones I want
 SUBSET_TRAJ = [
-    "hilti_2022/construction_upper_level_1",
-    "oxford_spires/keble_college_02",
-    # "newer_college_2020/01_short_experiment",
+    "newer_college_2020/01_short_experiment",
     "newer_college_2021/quad-easy",
     "multi_campus_2024/tuhh_day_04",
+    "oxford_spires/keble_college_02",
+    "hilti_2022/construction_upper_level_1",
+    "helipr/kaist_05",
+    "botanic_garden/1005_00",
 ]

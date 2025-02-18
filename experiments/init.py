@@ -50,7 +50,7 @@ def plot(name: str, force: bool):
         hue="Dataset",
         style="Initialization",
         markers=["s", "X", "o"],
-        style_order=["Identity", "ConstantVelocity", "Imu"],
+        style_order=["Identity", "Constant Velocity", "IMU"],
         dashes=False,
         legend=True,
     )
@@ -59,21 +59,26 @@ def plot(name: str, force: bool):
 
     # Reorder the legend to put blank one in the right spot
     handles, labels = ax.get_legend_handles_labels()
-    handles.insert(4, handles.pop(-1))
-    labels.insert(4, labels.pop(-1))
+    handles.insert(5, handles.pop(-1))
+    labels.insert(5, labels.pop(-1))
 
     ax.legend().set_visible(False)
     ax.tick_params(axis="x", pad=-1, rotation=90)
     ax.tick_params(axis="y", pad=-1)
 
-    ax.set_ylabel("$RTEt_{10} (m)$", labelpad=1)
+    traj = df.select("Trajectory").unique().to_numpy()
+    xmax = len(traj) - 1
+    extra = 1.0
+    ax.set_xlim(0.0 - extra, xmax + extra)
 
+    ax.set_ylabel(r"$RTEt_{10}\ (m)$", labelpad=1)
     ax.set_yscale("log")
     fig.legend(
         handles=handles,
         labels=labels,
         ncol=3,
         loc="outside lower center",
+        labelspacing=0.15,
     )
     plt_show(name)
 

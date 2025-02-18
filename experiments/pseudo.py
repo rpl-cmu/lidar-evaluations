@@ -11,20 +11,13 @@ from params import ExperimentParams, Feature, Initialization
 from wrappers import parser, plt_show
 from run import run_multithreaded
 from stats import compute_cache_stats
+from env import RESULTS_DIR, SUBSET_TRAJ, LEN
 
-dir = Path("results/25.02.14_pseudo_with_imu")
-# dir = Path("results/25.02.10_pseudo_new_projector_tighter_range")
+dir = RESULTS_DIR / "25.02.18_pseudo_plane"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    datasets = [
-        "hilti_2022/construction_upper_level_1",
-        "oxford_spires/keble_college_02",
-        # "newer_college_2020/01_short_experiment",
-        "newer_college_2021/quad-easy",
-    ]
-
     init = [
         Initialization.Identity,
         Initialization.ConstantVelocity,
@@ -43,10 +36,10 @@ def run(num_threads: int):
             pseudo_planar_epsilon=float(val),
             init=i,
         )
-        for d, i, val in product(datasets, init, epsilon)
+        for i, val, d in product(init, epsilon, SUBSET_TRAJ)
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads)
+    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
 
 
 def plot(name: str, force: bool):
@@ -79,7 +72,7 @@ def plot(name: str, force: bool):
     )
     ax[0].legend().set_visible(False)
     fig.legend(ncol=2, loc="outside lower center")
-    plt_show(Path("figures") / f"{name}.png")
+    plt_show(name)
 
 
 if __name__ == "__main__":

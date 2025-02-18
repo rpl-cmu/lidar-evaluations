@@ -65,8 +65,8 @@ def run(
             file = filter(lambda row: row[0] != "#", f)
             num = len(list(file))
         # We run for 4 lines short of the full dataset due to needing curr_gt, prev_gt, prev_prev_gt, etc
-        # We increase this to 10 just for good measure (likely to stop within 10 of the finish)
-        if num > length - 10:
+        # We increase this to 20 just for good measure (likely to stop within 10 of the finish)
+        if num > length - 20:
             return
 
     # Setup progress bar

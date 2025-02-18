@@ -12,29 +12,71 @@ from stats import ExperimentResult
 from run import run_multithreaded
 from wrappers import plt_show, parser, setup_plot
 from dataclasses import asdict
+from env import LEN, RESULTS_DIR, SUBSET_TRAJ
 
-
-dir = Path("results/25.02.10_window_effect")
+dir = RESULTS_DIR / "25.02.10_window_effect_with_edges"
 
 
 def run(num_threads: int):
-    datasets = [
-        "hilti_2022/construction_upper_level_1",
-        "oxford_spires/keble_college_02",
-        # "newer_college_2020/01_short_experiment",
-        "newer_college_2021/quad-easy",
-    ]
-
     experiments = [
         ExperimentParams(
             name="window",
             dataset=d,
-            features=[Feature.Planar],
+            features=[Feature.Planar, Feature.Edge],
         )
-        for d in datasets
+        for d in SUBSET_TRAJ
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads)
+    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
+
+
+def split_dataset_to_seq(df: pl.DataFrame) -> pl.DataFrame:
+    # ------------------------- Split dataset and sequences ------------------------- #
+    datasets_pretty_names = {
+        "newer_college_2020": "Newer College Stereo-Cam",
+        "newer_college_2021": "Newer College Multi-Cam",
+        "hilti_2022": "Hilti 2022",
+        "oxford_spires": "Oxford Spires",
+        "multi_campus_2024": "Multi-Campus",
+        "helipr": "HeLiPR",
+        "botanic_garden": "Botanic Garden",
+    }
+
+    def short(f: str) -> str:
+        if f.isdigit():
+            return f[-2:]
+        else:
+            return f[:1]
+
+    def sequence_pretty_names(seq) -> str:
+        seq = seq.replace("-", "_")
+        return "".join(short(d) for d in seq.split("_"))
+
+    df = (
+        df.lazy()
+        .with_columns(
+            pl.col("dataset")
+            .str.split("/")
+            .list.get(0)
+            .replace_strict(datasets_pretty_names)
+            .alias("Dataset"),
+            pl.col("dataset")
+            .str.split("/")
+            .list.get(1)
+            .map_elements(
+                lambda seq: sequence_pretty_names(seq), return_dtype=pl.String
+            )
+            .alias("Trajectory"),
+        )
+        .collect()
+    )
+
+    df = df.sort(
+        pl.col("Dataset").cast(pl.Enum(list(datasets_pretty_names.values()))),
+        "Trajectory",
+    )
+
+    return df
 
 
 def plot(name: str, force: bool):
@@ -72,17 +114,18 @@ def plot(name: str, force: bool):
                 )
 
             df = pl.DataFrame(results)
+            df = split_dataset_to_seq(df)
             df.write_csv(df_file)
     else:
         df = pl.read_csv(df_file)
 
-    fig, ax = plt.subplots(1, 1, figsize=(4, 2), layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(5, 3), layout="constrained")
     sns.lineplot(
         df,
         x="window",
         y="trans",
         ax=ax,
-        hue="dataset",
+        hue="Dataset",
         marker="o",
     )
 
@@ -92,11 +135,10 @@ def plot(name: str, force: bool):
     ax.tick_params(axis="x", pad=-2)
     ax.tick_params(axis="y", pad=-2)
 
-    # TODO: Clean up legend to list trajectories better
-    # fig.legend(ncol=2, loc="outside lower center")
+    ax.set_ylim(0, 10)
+    fig.legend(ncol=3, loc="outside lower center", labelspacing=0.15)
 
-    plt_show(Path("figures") / f"{name}.png")
-    plt.savefig(Path("graphics") / f"{name}.pdf", dpi=300)
+    plt_show(name)
 
 
 if __name__ == "__main__":

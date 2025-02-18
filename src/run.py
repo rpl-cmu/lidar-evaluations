@@ -70,8 +70,8 @@ def run(
             file = filter(lambda row: row[0] != "#", f)
             num = len(list(file))
         # We run for 4 lines short of the full dataset due to needing curr_gt, prev_gt, prev_prev_gt, etc
-        # We increase this to 10 just for good measure (likely to stop within 10 of the finish)
-        if num > length - 10:
+        # We increase this to 20 just for good measure (likely to stop within 10 of the finish)
+        if num > length - 20:
             return
 
     # Setup progress bar
@@ -294,24 +294,24 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "botanic_garden/1005_00"
+    dataset = "helipr/kaist_05"
 
     eps = [
         params.ExperimentParams(
             name="fix_cv_removed",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
-            dewarp=params.Dewarp.ConstantVelocity,
-            features=[params.Feature.Planar],
+            dewarp=params.Dewarp.Identity,
+            features=[params.Feature.Planar, params.Feature.Edge],
         )
     ]
 
-    directory = Path("results/25.02.14_fix_cv")
-    length = 200
+    directory = Path("results/25.02.18_kaist_edge_features")
+    length = 1000
     multithreaded = False
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
         for e in eps:
-            run(e, directory, visualize=False, length=length)
+            run(e, directory, visualize=True, length=length)

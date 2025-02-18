@@ -331,13 +331,13 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
 
         # ------------------------- Split dataset and sequences ------------------------- #
         datasets_pretty_names = {
-            "newer_college_2020": "Newer College Single-Cam",
+            "newer_college_2020": "Newer College Stereo-Cam",
             "newer_college_2021": "Newer College Multi-Cam",
             "hilti_2022": "Hilti 2022",
-            "helipr": "HeLiPR",
             "oxford_spires": "Oxford Spires",
             "multi_campus_2024": "Multi-Campus",
-            # "botanic_gardens": "Botanic Gardens",
+            "helipr": "HeLiPR",
+            "botanic_garden": "Botanic Garden",
         }
 
         def short(f: str) -> str:
@@ -374,7 +374,7 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             "Trajectory",
         )
 
-        # ------------------------- Cleanup dewarp names ------------------------- #
+        # ------------------------- Cleanup various names ------------------------- #
         dewarp_pretty_names = {
             "Identity": "None",
             "ConstantVelocity": "Constant Velocity",
@@ -384,13 +384,16 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             pl.col("dewarp").replace(dewarp_pretty_names).alias("Dewarp")
         )
 
-        # ------------------------- Rename other columns ------------------------- #
-        # convert 100steps -> 10sec
-        df = df.rename(
-            {
-                "init": "Initialization",
-            }
+        init_pretty_names = {
+            "Identity": "Identity",
+            "ConstantVelocity": "Constant Velocity",
+            "Imu": "IMU",
+        }
+        df = df.with_columns(
+            pl.col("init").replace(init_pretty_names).alias("Initialization")
         )
+
+        # ------------------------- Rename other columns ------------------------- #
 
         df.write_csv(df_file)
     else:

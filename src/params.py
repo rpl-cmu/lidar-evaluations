@@ -124,4 +124,4 @@ class ExperimentParams:
             + "/"
             + "".join(short(d) for d in seq.split("_"))
         )
-        return f"ds: {ds:>8}, {self.name[:20]:>20}"
+        return f"ds: {ds:>9}, {self.name[:20]:>20}"
