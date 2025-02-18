@@ -12,7 +12,7 @@ from serde.yaml import to_yaml
 import loam
 from evalio.types import SE3, SO3, LidarMeasurement, Stamp, Trajectory
 from params import ExperimentParams
-from env import INC_DATA_DIR
+from env import FIGURE_DIR, GRAPHICS_DIR, INC_DATA_DIR
 
 import os
 import matplotlib.pyplot as plt
@@ -81,8 +81,9 @@ def is_remote() -> bool:
     return os.environ.get("SSH_CONNECTION") is not None
 
 
-def plt_show(filename: str | Path):
-    plt.savefig(filename)
+def plt_show(name: str):
+    plt.savefig(FIGURE_DIR / f"{name}.png", dpi=300)
+    plt.savefig(GRAPHICS_DIR / f"{name}.pdf", dpi=300)
     if not is_remote():
         plt.show()
 

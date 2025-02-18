@@ -5,7 +5,7 @@ import sys
 import numpy as np
 
 sys.path.append("src")
-from env import ALL_TRAJ, LEN, FIGURE_DIR, RESULTS_DIR
+from env import ALL_TRAJ, LEN, RESULTS_DIR
 from params import ExperimentParams, Feature, Initialization
 from stats import compute_cache_stats
 from run_init import run_multithreaded
@@ -75,7 +75,7 @@ def plot(name: str, force: bool):
         ncol=3,
         loc="outside lower center",
     )
-    plt_show(FIGURE_DIR / f"{name}.png")
+    plt_show(name)
 
 
 if __name__ == "__main__":

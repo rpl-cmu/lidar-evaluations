@@ -10,7 +10,7 @@ from params import ExperimentParams, Feature, Initialization, Dewarp
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
-from env import ALL_TRAJ, LEN, RESULTS_DIR, FIGURE_DIR
+from env import ALL_TRAJ, LEN, RESULTS_DIR
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
@@ -64,6 +64,7 @@ def plot(name: str, force: bool):
         id_val = df_identity.filter(pl.col("dataset") == dataset)[0, "w100_RTEt"]
         df = df.with_columns(
             percent=pl.when(pl.col("dataset") == dataset)
+            # THIS IS THE LINE THAT ACTUALLY COMPUTES THINGS
             .then(pl.col("w100_RTEt") - id_val)
             .otherwise(pl.col("percent"))
         )
@@ -97,7 +98,7 @@ def plot(name: str, force: bool):
     ax.tick_params(axis="x", pad=-1, rotation=90)
     ax.tick_params(axis="y", pad=-1)
 
-    ax.set_ylabel("Percent Improvement", labelpad=3)
+    ax.set_ylabel("Difference from None", labelpad=3)
 
     fig.legend(
         handles=handles,
@@ -105,7 +106,7 @@ def plot(name: str, force: bool):
         ncol=3,
         loc="outside lower center",
     )
-    plt_show(FIGURE_DIR / f"{name}.png")
+    plt_show(name)
 
 
 if __name__ == "__main__":
