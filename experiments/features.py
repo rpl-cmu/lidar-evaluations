@@ -6,25 +6,23 @@ import sys
 import numpy as np
 
 sys.path.append("src")
-from params import ExperimentParams, Feature, Initialization, Dewarp
-from wrappers import parser, plt_show, setup_plot
+from params import ExperimentParams, Feature, Initialization
+from wrappers import parser, plt_show, setup_plot, powerset
 from run import run_multithreaded
 from stats import compute_cache_stats
 from env import ALL_TRAJ, LEN, RESULTS_DIR, FIGURE_DIR
 
 
 # dir = Path("results/25.02.06_dewarp_with_init")
-dir = RESULTS_DIR / "25.02.17_all_dewarp_versions"
+dir = RESULTS_DIR / "25.02.17_features"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    dewarp = [
-        Dewarp.Identity,
-        Dewarp.ConstantVelocity,
-        Dewarp.Imu,
-        Dewarp.GroundTruthConstantVelocity,
-    ]
+    features = powerset([Feature.Planar, Feature.Edge, Feature.Point])
+    features = [list(f) for f in features]
+
+    use_plane_to_plane = [True, False]
 
     init = [
         # Initialization.Identity,
@@ -36,19 +34,20 @@ def run(num_threads: int):
     # ------------------------- Compute product of options ------------------------- #
     experiments = [
         ExperimentParams(
-            name=f"{de.name}_{i.name}",
+            name=f"{'_'.join([str(f) for f in feats])}_{pp}_{i}",
             dataset=d,
-            features=[Feature.Planar],
-            dewarp=de,
+            features=feats,
+            use_plane_to_plane=pp,
             init=i,
         )
-        for (d, de, i) in product(ALL_TRAJ, dewarp, init)
+        for (feats, pp, i, d) in product(features, use_plane_to_plane, init, ALL_TRAJ)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
 
 
 def plot(name: str, force: bool):
+    # TODO
     df = compute_cache_stats(dir, force=force)
 
     df = df.filter(pl.col("Initialization") == "GroundTruth")
@@ -64,7 +63,7 @@ def plot(name: str, force: bool):
         id_val = df_identity.filter(pl.col("dataset") == dataset)[0, "w100_RTEt"]
         df = df.with_columns(
             percent=pl.when(pl.col("dataset") == dataset)
-            .then(pl.col("w100_RTEt") - id_val)
+            .then(pl.col("w100_RTEt") / id_val)
             .otherwise(pl.col("percent"))
         )
 

@@ -288,6 +288,7 @@ def run_multithreaded(
             desc="Experiments",
             leave=True,
             dynamic_ncols=True,
+            smoothing=0.0,
         ):
             pass
 

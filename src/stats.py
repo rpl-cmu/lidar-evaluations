@@ -370,7 +370,8 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
         )
 
         df = df.sort(
-            pl.col("Dataset").cast(pl.Enum(list(datasets_pretty_names.values())))
+            pl.col("Dataset").cast(pl.Enum(list(datasets_pretty_names.values()))),
+            "Trajectory",
         )
 
         # ------------------------- Cleanup dewarp names ------------------------- #
