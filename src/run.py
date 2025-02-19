@@ -298,16 +298,15 @@ if __name__ == "__main__":
 
     eps = [
         params.ExperimentParams(
-            name="curvature_100",
+            name="original",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
-            curvature_planar_threshold=100,
-            features=[params.Feature.Planar],
+            features=[params.Feature.Edge],
         )
     ]
 
-    directory = Path("results/25.02.19_kaist_fix_planar")
+    directory = Path("results/25.02.19_helipr_edge_center")
     length = 500
     multithreaded = False
 

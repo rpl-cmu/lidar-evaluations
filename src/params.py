@@ -54,7 +54,7 @@ class ExperimentParams:
     # registration
     pseudo_planar_epsilon: float = 0.0
     use_plane_to_plane: bool = False
-    init: Initialization = Initialization.GroundTruth
+    init: Initialization = Initialization.ConstantVelocity
     dewarp: Dewarp = Dewarp.Identity
 
     def __post_init__(self):

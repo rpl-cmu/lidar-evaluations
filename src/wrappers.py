@@ -36,7 +36,15 @@ def setup_plot():
     plt.rcParams["font.family"] = "Times New Roman"
     plt.rcParams["mathtext.fontset"] = "stix"
 
-    return c
+    return {
+        "Newer College Stereo-Cam": c[0],
+        "Newer College Multi-Cam": c[1],
+        "Hilti 2022": c[2],
+        "Oxford Spires": c[3],
+        "Multi-Campus": c[5],
+        "HeLiPR": c[5],
+        "Botanic Garden": c[6],
+    }
 
 
 def parser(name: str) -> argparse.Namespace:

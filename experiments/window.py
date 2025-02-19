@@ -14,7 +14,8 @@ from wrappers import plt_show, parser, setup_plot
 from dataclasses import asdict
 from env import LEN, RESULTS_DIR, SUBSET_TRAJ
 
-dir = RESULTS_DIR / "25.02.10_window_effect_with_edges"
+# weird date, but this is the right one
+dir = RESULTS_DIR / "25.02.19_window_cv_fixed_edges"
 
 
 def run(num_threads: int):

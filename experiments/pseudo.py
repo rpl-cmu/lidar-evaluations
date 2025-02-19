@@ -1,5 +1,4 @@
 from itertools import product
-from pathlib import Path
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -8,7 +7,7 @@ import polars as pl
 
 sys.path.append("src")
 from params import ExperimentParams, Feature, Initialization
-from wrappers import parser, plt_show
+from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
 from env import RESULTS_DIR, SUBSET_TRAJ, LEN
@@ -43,35 +42,56 @@ def run(num_threads: int):
 
 
 def plot(name: str, force: bool):
-    df = compute_cache_stats(dir, force=force)
-    df = df.filter(~pl.col("name").str.contains("planar"))
+    palette = setup_plot()
 
-    fig, ax = plt.subplots(1, 2, figsize=(10, 5), layout="constrained", sharey=False)
+    good = [
+        "Newer College Stereo-Cam",
+        "Newer College Multi-Cam",
+        "Multi-Campus",
+        "Oxford Spires",
+        "Botanic Garden",
+        # "Hilti 2022",
+    ]
+
+    df = compute_cache_stats(dir, force=force)
+    df = df.filter(pl.col("Dataset").is_in(good))
+
+    fig, ax = plt.subplots(1, 1, figsize=(5, 3), layout="constrained", sharey=True)
     sns.lineplot(
         df,
-        ax=ax[0],
-        x="pseudo_planar_epsilon",
-        y="w100_RTEr",
-        hue="dataset",
-        style="init",
-        markers=["s", "X", "o", "P"],
-        style_order=["Identity", "ConstantVelocity", "GroundTruth", "Imu"],
-        dashes=False,
-    )
-    sns.lineplot(
-        df,
-        ax=ax[1],
+        ax=ax,
         x="pseudo_planar_epsilon",
         y="w100_RTEt",
-        hue="dataset",
-        style="init",
+        hue="Dataset",
+        style="Initialization",
         markers=["s", "X", "o", "P"],
-        style_order=["Identity", "ConstantVelocity", "GroundTruth", "Imu"],
+        style_order=["Identity", "Constant Velocity", "IMU", "Ground Truth"],
         dashes=False,
-        legend=False,
+        palette=palette,
     )
-    ax[0].legend().set_visible(False)
-    fig.legend(ncol=2, loc="outside lower center")
+    # blank line for the legend
+    new_handles = [4, 5, 8, 9]
+    for _ in new_handles:
+        ax.plot(np.NaN, np.NaN, "-", color="none", label=" ")
+    # Reorder the legend to put blank one in the right spot
+    handles, labels = ax.get_legend_handles_labels()
+    for i in new_handles:
+        handles.insert(i, handles.pop(-1))
+        labels.insert(i, labels.pop(-1))
+
+    ax.tick_params(axis="x", pad=-1)
+    ax.tick_params(axis="y", pad=-1)
+    ax.set_xlabel(r"$\epsilon$", labelpad=1)
+    ax.set_ylabel(r"$RTEt_{10}\ (m)$", labelpad=1)
+    ax.legend().set_visible(False)
+
+    fig.legend(
+        handles=handles,
+        labels=labels,
+        ncol=3,
+        loc="outside lower center",
+        labelspacing=0.15,
+    )
     plt_show(name)
 
 
