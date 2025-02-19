@@ -28,7 +28,7 @@ def run(num_threads: int):
             init=i,
             features=[Feature.Planar],
         )
-        for d, i in product(ALL_TRAJ, init)
+        for i, d in product(init, ALL_TRAJ)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)

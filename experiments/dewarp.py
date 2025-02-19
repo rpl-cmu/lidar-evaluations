@@ -23,7 +23,7 @@ def run(num_threads: int):
         Dewarp.Identity,
         Dewarp.ConstantVelocity,
         Dewarp.Imu,
-        Dewarp.GroundTruthConstantVelocity,
+        # Dewarp.GroundTruthConstantVelocity,
     ]
 
     init = [
@@ -98,7 +98,12 @@ def plot(name: str, force: bool):
     ax.tick_params(axis="x", pad=-1, rotation=90)
     ax.tick_params(axis="y", pad=-1)
 
-    ax.set_ylabel("Difference from None (m)", labelpad=3)
+    ax.set_ylabel("Difference from None $(m)$", labelpad=3)
+
+    traj = df.select("Trajectory").unique().to_numpy()
+    xmax = len(traj) - 1
+    extra = 1.0
+    ax.set_xlim(0.0 - extra, xmax + extra)
 
     fig.legend(
         handles=handles,

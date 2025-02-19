@@ -90,7 +90,7 @@ def load_data(
             lidar_stamps.append(mm.stamp)
 
         # Keep a little fudge room since we skip some stamps at the start
-        if length is not None and len(lidar_stamps) >= length + 100:
+        if length is not None and len(lidar_stamps) >= length + 500:
             break
 
     lidar_rate = len(lidar_stamps) / (lidar_stamps[-1] - lidar_stamps[0])
@@ -402,10 +402,8 @@ if __name__ == "__main__":
     # test("hilti_2022/basement_2")
     # quit()
 
-    out_dir = Path("data_temp")
-
     for name in ALL_TRAJ:
-        run(name, out_dir=out_dir, force=False, length=LEN)
+        run(name, out_dir=INC_DATA_DIR, force=False, length=LEN)
 
     # test("helipr/kaist_05", length=500)
-    # run("helipr/kaist_05", out_dir=out_dir, force=True, length=100)
+    # run("botanic_garden/1005_00", out_dir=Path("data_temp"), force=True, length=3000)

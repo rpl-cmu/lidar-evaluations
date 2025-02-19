@@ -246,7 +246,7 @@ def eval_dataset(
                 "w100_RTEt": window100_rte.trans,
                 "w100_RTEr": window100_rte.rot,
                 "RTEt": rte.trans,
-                # "RTEr": rte.rot,
+                "RTEr": rte.rot,
                 # "ATEt": ate.trans,
                 # "ATEr": ate.rot,
                 "point": exp.get_feature(Feature.Point).mean(),
