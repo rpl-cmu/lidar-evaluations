@@ -13,8 +13,9 @@ from stats import compute_cache_stats
 from env import ALL_TRAJ, LEN, RESULTS_DIR
 
 
-# dir = Path("results/25.02.06_dewarp_with_init")
+# TODO: Need to rerun with constant velocity instead of ground truth init
 dir = RESULTS_DIR / "25.02.17_all_dewarp_versions"
+dir = RESULTS_DIR / "25.02.18_dewarp_with_edges"
 
 
 def run(num_threads: int):
@@ -33,16 +34,18 @@ def run(num_threads: int):
         Initialization.GroundTruth,
     ]
 
+    datasets = [d for d in ALL_TRAJ if "botanic" in d]
+
     # ------------------------- Compute product of options ------------------------- #
     experiments = [
         ExperimentParams(
             name=f"{de.name}_{i.name}",
             dataset=d,
-            features=[Feature.Planar],
+            features=[Feature.Planar, Feature.Edge],
             dewarp=de,
             init=i,
         )
-        for (d, de, i) in product(ALL_TRAJ, dewarp, init)
+        for (d, de, i) in product(datasets, dewarp, init)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
@@ -52,8 +55,6 @@ def plot(name: str, force: bool):
     df = compute_cache_stats(dir, force=force)
 
     df = df.filter(pl.col("Initialization") == "GroundTruth")
-    df = df.filter(pl.col("Dewarp") != "GroundTruthConstantVelocity")
-    # df = df.filter(pl.col("Dataset") != "HeLiPR")
 
     # Get identity versions
     df_identity = df.filter(pl.col("Dewarp") == "None").select(["dataset", "w100_RTEt"])
