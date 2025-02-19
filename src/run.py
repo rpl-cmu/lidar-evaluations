@@ -298,20 +298,21 @@ if __name__ == "__main__":
 
     eps = [
         params.ExperimentParams(
-            name="fix_cv_removed",
+            name="curvature_100",
             dataset=dataset,
             init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
-            features=[params.Feature.Planar, params.Feature.Edge],
+            curvature_planar_threshold=100,
+            features=[params.Feature.Planar],
         )
     ]
 
-    directory = Path("results/25.02.18_kaist_edge_features")
-    length = 1000
+    directory = Path("results/25.02.19_kaist_fix_planar")
+    length = 500
     multithreaded = False
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
         for e in eps:
-            run(e, directory, visualize=True, length=length)
+            run(e, directory, visualize=False, length=length)
