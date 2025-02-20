@@ -9,7 +9,7 @@ import polars as pl
 import sys
 
 sys.path.append("src")
-from env import SUBSET_TRAJ, LEN
+from env import SUBSET_TRAJ, LEN, COL_WIDTH
 from params import Curvature, ExperimentParams, Feature, Initialization
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
@@ -49,8 +49,8 @@ def make_plot_bar(ax, df: pl.DataFrame, name: str, to_plot: str):
     palette = setup_plot()
     df = df.filter(
         pl.col("curvature_planar_threshold").eq(1.0)
-        # & pl.col("Dataset").eq("HeLiPR").not_()
-        # & pl.col("Dataset").eq("Botanic Garden").not_()
+        & pl.col("Dataset").eq("HeLiPR").not_()
+        & pl.col("Dataset").eq("Botanic Garden").not_()
     )
 
     ax.set_title("Loam")
@@ -65,8 +65,8 @@ def make_plot_bar(ax, df: pl.DataFrame, name: str, to_plot: str):
     markers = ["s", "X", "o"]
     names = ["Loam", "NN-Eigen", "Scanline-Eigen"]
 
-    num_datasets = len(palette)
     tick_labels = ax.get_xticklabels()
+    num_datasets = len(tick_labels)
     bars = [b for b in ax.get_children() if isinstance(b, Rectangle)]
     for i, label in enumerate(tick_labels):
         for j in range(3):
@@ -114,17 +114,15 @@ def plot(name: str, force: bool):
     df = compute_cache_stats(dir, force)
 
     _palette = setup_plot()
-    fig, ax = plt.subplots(1, 2, figsize=(8.5, 2), layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(COL_WIDTH, 2), layout="constrained")
 
-    make_plot_bar(ax[0], df, name, "planar")
-    make_plot_bar(ax[1], df, name, "w100_RTEt")
+    make_plot_bar(ax, df, name, "w100_RTEt")
 
-    handles, labels = ax[0].get_legend_handles_labels()
+    handles, labels = ax.get_legend_handles_labels()
     handles = handles[-3:]
     labels = labels[-3:]
 
-    ax[0].set_ylabel("Number of Planar Features")
-    ax[1].set_ylabel(r"$RTEt_{10}\ (m)$")
+    ax.set_ylabel(r"$RTEt_{10}\ (m)$")
 
     fig.legend(
         ncol=3,

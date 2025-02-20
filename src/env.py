@@ -7,6 +7,9 @@ INC_DATA_DIR = Path("./data")
 
 LEN = 3000
 
+TEXT_WIDTH = 516.0 / 72.27
+COL_WIDTH = 252.0 / 72.27
+
 ALL_TRAJ = [
     # ncd20
     "newer_college_2020/01_short_experiment",

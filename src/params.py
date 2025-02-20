@@ -38,6 +38,7 @@ class Dewarp(PrettyPrintEnum):
 class Curvature(PrettyPrintEnum):
     Loam = 0
     Eigen = 1
+    Eigen_NN = 2
 
     def into(self) -> loam.Curvature:
         return loam.Curvature(self.value)

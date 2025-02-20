@@ -41,7 +41,7 @@ def setup_plot():
         "Newer College Multi-Cam": c[1],
         "Hilti 2022": c[2],
         "Oxford Spires": c[3],
-        "Multi-Campus": c[5],
+        "Multi-Campus": c[4],
         "HeLiPR": c[5],
         "Botanic Garden": c[6],
     }
