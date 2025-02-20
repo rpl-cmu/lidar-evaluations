@@ -117,6 +117,41 @@ class ExperimentResult:
 
         return self._compute_metric(window_deltas_gts, window_deltas_poses)
 
+    def distance_wrte(self, window: float = 2) -> Error:
+        def norm2(a, b):
+            diff = a - b
+            return diff @ diff
+
+        window2 = window * window
+        window_deltas_poses = []
+        window_deltas_gts = []
+        end_idx = 1
+        end_idx_prev = 0
+        for i in range(len(self.gt)):
+            start_pose = self.iterated_poses[i]
+            start_gt = self.iterated_gt[i]
+            while (
+                end_idx < len(self.gt)
+                and norm2(start_gt.trans, self.iterated_gt[end_idx].trans) < window2
+            ):
+                end_idx += 1
+
+            if end_idx >= len(self.gt):
+                break
+            elif end_idx == end_idx_prev:
+                continue
+
+            assert end_idx > i, "Something went wrong, window is negative"
+
+            window_deltas_poses.append(
+                start_pose.inverse() * self.iterated_poses[end_idx]
+            )
+            window_deltas_gts.append(start_gt.inverse() * self.iterated_gt[end_idx])
+
+            end_idx_prev = end_idx
+
+        return self._compute_metric(window_deltas_gts, window_deltas_poses)
+
     def get_feature(self, feature: Feature) -> np.ndarray:
         return self.features[feature]
 
@@ -231,22 +266,22 @@ def eval_dataset(
     results = []
     for exp in experiments:
         # TODO: sse or mean here?
-        # window10_rte = exp.windowed_rte(10).mean()
         window100_rte = exp.windowed_rte(100).sse()
         window200_rte = exp.windowed_rte(200).sse()
-        rte = exp.rte().sse()
+        windowdist4_rte = exp.distance_wrte(2.0).sse()
+        # rte = exp.rte().sse()
         # ate = exp.ate().sse()
         r = asdict(exp.params)
         r.update(
             {
-                # "w10_RTEt": window10_rte.trans,
-                # "w10_RTEr": window10_rte.rot,
                 "w200_RTEt": window200_rte.trans,
                 "w200_RTEr": window200_rte.rot,
                 "w100_RTEt": window100_rte.trans,
                 "w100_RTEr": window100_rte.rot,
-                "RTEt": rte.trans,
-                "RTEr": rte.rot,
+                "w4_RTEt": windowdist4_rte.trans,
+                "w4_RTEr": windowdist4_rte.rot,
+                # "RTEt": rte.trans,
+                # "RTEr": rte.rot,
                 # "ATEt": ate.trans,
                 # "ATEr": ate.rot,
                 "point": exp.get_feature(Feature.Point).mean(),
@@ -322,7 +357,7 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             all_data += eval_dataset(dataset, print_results=False)
 
         for d in all_data:
-            del d["features"]
+            d["features"] = ", ".join([f.name for f in d["features"]])
             d["curvature"] = d["curvature"].name
             d["init"] = d["init"].name
             d["dewarp"] = d["dewarp"].name
@@ -392,6 +427,15 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
         df = df.with_columns(
             pl.col("init").replace(init_pretty_names).alias("Initialization")
         )
+
+        df = df.with_columns(
+            pl.when(pl.col("use_plane_to_plane"))
+            .then(pl.lit("Plane-To-Plane"))
+            .otherwise(pl.lit("Point-To-Plane"))
+            .alias("Planar Type")
+        )
+
+        df = df.rename({"features": "Features"})
 
         # ------------------------- Rename other columns ------------------------- #
 
