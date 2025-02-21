@@ -16,7 +16,7 @@ from run import run_multithreaded
 from stats import compute_cache_stats
 
 
-dir = Path("results/25.02.20_curvature")
+dir = Path("results/25.02.20_curvature_remove_edge_eigen_scanline")
 
 
 def run(num_threads: int):
@@ -49,11 +49,10 @@ def make_plot_bar(ax, df: pl.DataFrame, name: str, to_plot: str):
     palette = setup_plot()
     df = df.filter(
         pl.col("curvature_planar_threshold").eq(1.0)
-        & pl.col("Dataset").eq("HeLiPR").not_()
-        & pl.col("Dataset").eq("Botanic Garden").not_()
+        # & pl.col("Dataset").eq("HeLiPR").not_()
+        # & pl.col("Dataset").eq("Botanic Garden").not_()
     )
 
-    ax.set_title("Loam")
     sns.barplot(
         df,
         ax=ax,
@@ -91,7 +90,7 @@ def make_plot_bar(ax, df: pl.DataFrame, name: str, to_plot: str):
 
 
 def make_plot_line(df: pl.DataFrame, name: str, to_plot: str):
-    fig, ax = plt.subplots(1, 1, figsize=(5, 3), layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(5, 6), layout="constrained")
 
     ax.set_title("Loam")
     sns.lineplot(
@@ -106,7 +105,7 @@ def make_plot_line(df: pl.DataFrame, name: str, to_plot: str):
         dashes=False,
     )
     ax.legend().set_visible(False)
-    # fig.legend(ncol=2, loc="outside lower center")
+    fig.legend(ncol=2, loc="outside lower center")
     plt_show(f"{name}_{to_plot}")
 
 
