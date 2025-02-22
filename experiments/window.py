@@ -7,15 +7,15 @@ import sys
 import polars as pl
 
 sys.path.append("src")
-from params import ExperimentParams, Feature
+from params import ExperimentParams, Feature, Initialization
 from stats import ExperimentResult
 from run import run_multithreaded
 from wrappers import plt_show, parser, setup_plot
 from dataclasses import asdict
-from env import LEN, RESULTS_DIR, SUBSET_TRAJ
+from env import COL_WIDTH, LEN, RESULTS_DIR, SUBSET_TRAJ
 
 # weird date, but this is the right one
-dir = RESULTS_DIR / "25.02.19_window_cv_fixed_edges"
+dir = RESULTS_DIR / "25.02.21_window"
 
 
 def run(num_threads: int):
@@ -24,6 +24,7 @@ def run(num_threads: int):
             name="window",
             dataset=d,
             features=[Feature.Planar, Feature.Edge],
+            init=Initialization.GroundTruth,
         )
         for d in SUBSET_TRAJ
     ]
@@ -120,24 +121,24 @@ def plot(name: str, force: bool):
     else:
         df = pl.read_csv(df_file)
 
-    fig, ax = plt.subplots(1, 1, figsize=(5, 3), layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(COL_WIDTH + 0.5, 1.75), layout="constrained")
     sns.lineplot(
         df,
         x="window",
         y="trans",
         ax=ax,
         hue="Dataset",
-        marker="o",
+        marker=".",
     )
 
     ax.legend().set_visible(False)
-    ax.set_ylabel(r"$RTE_j$ (m)", labelpad=1)
+    ax.set_ylabel(r"$\text{RTEt}_j\ \ (m)$", labelpad=0)
     ax.set_xlabel(r"Window (sec)", labelpad=1)
     ax.tick_params(axis="x", pad=-2)
     ax.tick_params(axis="y", pad=-2)
 
     ax.set_ylim(0, 10)
-    fig.legend(ncol=3, loc="outside lower center", labelspacing=0.15)
+    # fig.legend(ncol=3, loc="outside lower center", labelspacing=0.15)
 
     plt_show(name)
 

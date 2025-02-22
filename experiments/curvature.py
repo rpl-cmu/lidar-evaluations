@@ -1,28 +1,30 @@
 from itertools import product
 from pathlib import Path
-from typing import cast
-from matplotlib.patches import Rectangle
-import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
 import sys
 
 sys.path.append("src")
-from env import SUBSET_TRAJ, LEN, COL_WIDTH
+from env import ALL_TRAJ, LEN, COL_WIDTH
 from params import Curvature, ExperimentParams, Feature, Initialization
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
 
+"""
+Test for the effect of curvature computations methods
 
-dir = Path("results/25.02.20_curvature_remove_edge_eigen_scanline")
+Changelog
+- 25.02.20: Switched curvature value to 7.0 to make each method get similar number of features. Also switch to ground truth initialization
+
+"""
+
+dir = Path("results/25.02.20_curvature_7.0")
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    curvature_values = np.linspace(0.00, 2.5, 6)[1:]
-
     curvatures = [
         Curvature.Loam,
         Curvature.Eigen,
@@ -32,107 +34,96 @@ def run(num_threads: int):
     # ------------------------- Compute product of options ------------------------- #
     experiments = [
         ExperimentParams(
-            name=f"{c.name}_{c_val:.3f}",
+            name=c.name,
             dataset=d,
             features=[Feature.Planar],
             curvature=c,
-            curvature_planar_threshold=float(c_val),
-            init=Initialization.ConstantVelocity,
+            curvature_planar_threshold=7.0,
+            init=Initialization.GroundTruth,
         )
-        for c, c_val, d in product(curvatures, curvature_values, SUBSET_TRAJ)
+        for c, d in product(curvatures, ALL_TRAJ)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
 
 
-def make_plot_bar(ax, df: pl.DataFrame, name: str, to_plot: str):
-    palette = setup_plot()
-    df = df.filter(
-        pl.col("curvature_planar_threshold").eq(1.0)
-        # & pl.col("Dataset").eq("HeLiPR").not_()
-        # & pl.col("Dataset").eq("Botanic Garden").not_()
+def plot_classic(name: str, force: bool):
+    df = compute_cache_stats(dir, force=force)
+
+    metric = "w100_RTEt"
+    # metric = "planar"
+
+    # Get identity versions
+    df_identity = df.filter(pl.col("Curvature") == "Classic").select(
+        ["dataset", metric]
     )
 
-    sns.barplot(
-        df,
-        ax=ax,
-        x="Dataset",
-        y=to_plot,
-        hue="curvature",
+    # compute percent improvement
+    df = df.with_columns(percent=pl.zeros(df.shape[0]))
+    for dataset in df["dataset"].unique():
+        id_val = df_identity.filter(pl.col("dataset") == dataset)[0, metric]
+        df = df.with_columns(
+            percent=pl.when(pl.col("dataset") == dataset)
+            # THIS IS THE LINE THAT ACTUALLY COMPUTES THINGS
+            .then(100 * (pl.col(metric) - id_val) / id_val)
+            .otherwise(pl.col("percent"))
+        )
+
+    _c = setup_plot()
+    fig, ax = plt.subplots(
+        1,
+        1,
+        figsize=(COL_WIDTH + 0.5, 1.75),
+        layout="constrained",
+        sharey=False,
+        sharex=True,
     )
 
-    markers = ["s", "X", "o"]
-    names = ["Loam", "NN-Eigen", "Scanline-Eigen"]
-
-    tick_labels = ax.get_xticklabels()
-    num_datasets = len(tick_labels)
-    bars = [b for b in ax.get_children() if isinstance(b, Rectangle)]
-    for i, label in enumerate(tick_labels):
-        for j in range(3):
-            # Change bar colors to match the dataset
-            color = palette[label.get_text()]
-            rect = cast(Rectangle, bars[i + j * num_datasets])
-            rect.set_facecolor(color)
-            # Add shape to top of bar
-            x = rect.get_x() + rect.get_width() / 2
-            y = rect.get_height()
-            ax.plot(x, y, marker=markers[j], color=color, markeredgecolor="white")
-
-    # Remove dataset names
-    ax.set_xticklabels([])
-    ax.set_xlabel("Dataset", labelpad=-5)
-
-    # blank line for the legend
-    for m, n in zip(markers, names):
-        sns.lineplot([np.NaN], marker=m, color="black", label=n, ax=ax)
-
-    ax.legend().set_visible(False)
-
-
-def make_plot_line(df: pl.DataFrame, name: str, to_plot: str):
-    fig, ax = plt.subplots(1, 1, figsize=(5, 6), layout="constrained")
-
-    ax.set_title("Loam")
     sns.lineplot(
         df,
         ax=ax,
-        x="curvature_planar_threshold",
-        y=to_plot,
-        hue="dataset",
-        style="curvature",
+        x="Trajectory",
+        y="percent",
+        hue="Dataset",
+        style="Curvature",
         markers=["s", "X", "o"],
-        # style_order=["Identity", "ConstantVelocity", "GroundTruth"],
+        style_order=["Classic", "Scanline-Eigen", "NN-Eigen"],
         dashes=False,
+        legend=True,
     )
-    ax.legend().set_visible(False)
-    fig.legend(ncol=2, loc="outside lower center")
-    plt_show(f"{name}_{to_plot}")
 
-
-def plot(name: str, force: bool):
-    df = compute_cache_stats(dir, force)
-
-    _palette = setup_plot()
-    fig, ax = plt.subplots(1, 1, figsize=(COL_WIDTH, 2), layout="constrained")
-
-    make_plot_bar(ax, df, name, "w100_RTEt")
-
+    # Remove dataset from legend
     handles, labels = ax.get_legend_handles_labels()
     handles = handles[-3:]
     labels = labels[-3:]
 
-    ax.set_ylabel(r"$RTEt_{10}\ (m)$")
+    ax.legend().set_visible(False)
+    ax.tick_params(axis="x", pad=-3, rotation=90, labelsize=7)
+    ax.tick_params(axis="y", pad=-2.4)
 
-    fig.legend(
-        ncol=3,
-        loc="outside lower center",
-        labels=labels,
+    traj = df.select("Trajectory").unique().to_numpy()
+    xmax = len(traj) - 1
+    extra = 1.0
+    ax.set_xlim(0.0 - extra, xmax + extra)
+
+    curr_ylim = ax.get_ylim()
+    ax.set_ylim(curr_ylim[0], curr_ylim[1] + 1)
+
+    ax.set_ylabel(r"$\text{RTEt}_{10}$ Change (%)", labelpad=3)
+    # ax.set_yscale("log")
+    leg = fig.legend(
         handles=handles,
-    )
+        labels=labels,
+        ncol=3,
+        borderpad=0.2,
+        labelspacing=0.15,
+        loc="outside upper left",
+        columnspacing=3.35,
+        bbox_to_anchor=(0.09, 1.155),
+    ).get_frame()
+    leg.set_boxstyle("square")  # type: ignore
+    leg.set_linewidth(1.0)
     plt_show(name)
-
-    make_plot_line(df, name, "planar")
-    make_plot_line(df, name, "w100_RTEt")
 
 
 if __name__ == "__main__":
@@ -141,4 +132,4 @@ if __name__ == "__main__":
     if args.action == "run":
         run(args.num_threads)
     elif args.action == "plot":
-        plot(args.name, args.force)
+        plot_classic(args.name, args.force)

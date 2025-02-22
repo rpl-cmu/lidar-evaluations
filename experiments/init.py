@@ -25,6 +25,7 @@ def run(num_threads: int):
             name=i.name,
             dataset=d,
             init=i,
+            # this doesn't actually matter at all
             features=[Feature.Planar],
         )
         for i, d in product(init, ALL_TRAJ)

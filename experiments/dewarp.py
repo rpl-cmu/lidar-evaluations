@@ -30,7 +30,7 @@ def run(num_threads: int):
             dataset=d,
             features=[Feature.Planar, Feature.Edge],
             dewarp=de,
-            init=Initialization.ConstantVelocity,
+            init=Initialization.GroundTruth,
         )
         for (de, d) in product(dewarp, ALL_TRAJ)
     ]
