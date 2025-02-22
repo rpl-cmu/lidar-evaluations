@@ -3,114 +3,256 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
 import sys
-import numpy as np
 
 sys.path.append("src")
 from params import ExperimentParams, Feature, Initialization
 from wrappers import parser, plt_show, setup_plot, powerset
 from run import run_multithreaded
 from stats import compute_cache_stats
-from env import ALL_TRAJ, LEN, RESULTS_DIR, FIGURE_DIR
+from env import ALL_TRAJ, COL_WIDTH, LEN, RESULTS_DIR
 
-
-# dir = Path("results/25.02.06_dewarp_with_init")
-dir = RESULTS_DIR / "25.02.17_features"
+# dir = RESULTS_DIR / "25.02.17_features"
+# dir = RESULTS_DIR / "25.02.19_features"
+dir = RESULTS_DIR / "25.02.20_features_pointall_fixed"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
     features = powerset([Feature.Planar, Feature.Edge, Feature.Point])
     features = [list(f) for f in features]
-
-    use_plane_to_plane = [True, False]
+    features = [
+        # The main ones we'll use
+        # [Feature.Point], # already did
+        # [Feature.Planar],
+        # [Feature.Planar, Feature.Edge],
+        #
+        # [Feature.Planar, Feature.Point],
+        #
+        # Try just for kicks
+        [Feature.PointAll],
+        #
+        # This is just for research purposes... I wonder how adding "bad" planar points actually impacts things
+        [Feature.PlanarAll],
+        #
+        # [Feature.Planar, Feature.Point],
+        # [Feature.Planar, Feature.Edge, Feature.Point],
+        # [Feature.Edge],
+        # [Feature.Edge, Feature.Point],
+    ]
 
     init = [
-        # Initialization.Identity,
-        # Initialization.ConstantVelocity,
+        Initialization.Identity,
+        Initialization.ConstantVelocity,
         # Initialization.Imu,
-        Initialization.GroundTruth,
+        # Initialization.GroundTruth,
     ]
 
     # ------------------------- Compute product of options ------------------------- #
     experiments = [
         ExperimentParams(
-            name=f"{'_'.join([str(f) for f in feats])}_{pp}_{i}",
+            name=f"{'_'.join([str(f) for f in feats])}_{i}",
             dataset=d,
             features=feats,
-            use_plane_to_plane=pp,
+            use_plane_to_plane=False,
+            # curvature=Curvature.Eigen,
             init=i,
         )
-        for (feats, pp, i, d) in product(features, use_plane_to_plane, init, ALL_TRAJ)
+        for (feats, i, d) in product(features, init, ALL_TRAJ)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
 
 
-def plot(name: str, force: bool):
-    # TODO
+def plot_feature_comp(name: str, force: bool):
     df = compute_cache_stats(dir, force=force)
 
-    df = df.filter(pl.col("Initialization") == "GroundTruth")
-    df = df.filter(pl.col("Dewarp") != "GroundTruthConstantVelocity")
-    # df = df.filter(pl.col("Dataset") != "HeLiPR")
-
-    # Get identity versions
-    df_identity = df.filter(pl.col("Dewarp") == "None").select(["dataset", "w100_RTEt"])
-
     # compute percent improvement
+    metric = "w100_RTEr"
     df = df.with_columns(percent=pl.zeros(df.shape[0]))
+
+    features = [
+        # Plot with this showing that it's very very sensitive to initialization
+        # Show raw values for this one?? along with planar values as a comparison??
+        "Planar",
+        "Planar, Edge",
+        # "Planar, Point",
+        "Point",
+        # "PointAll",
+    ]
+
+    df = df.filter(
+        pl.col("Initialization").eq("Constant Velocity")
+        & pl.col("Features").is_in(features)
+    )
+
     for dataset in df["dataset"].unique():
-        id_val = df_identity.filter(pl.col("dataset") == dataset)[0, "w100_RTEt"]
+        filter = pl.col("dataset").eq(dataset)
+        # Get value of trajectory, feature, and id init
+        id_val = df.filter(filter & pl.col("Features").eq("Planar"))[0, metric]
         df = df.with_columns(
-            percent=pl.when(pl.col("dataset") == dataset)
-            .then(pl.col("w100_RTEt") / id_val)
+            percent=pl.when(filter)
+            # THIS IS THE LINE THAT ACTUALLY COMPUTES THINGS
+            .then(100 * (pl.col(metric) - id_val) / id_val)
             .otherwise(pl.col("percent"))
         )
 
-    _c = setup_plot()
+    palette = setup_plot()
     fig, ax = plt.subplots(
-        1, 1, figsize=(5, 3), layout="constrained", sharey=False, sharex=True
+        1,
+        1,
+        figsize=(COL_WIDTH + 0.5, 2.0),
+        layout="constrained",
+        sharey=True,
+        sharex=True,
     )
 
     sns.lineplot(
-        df,
+        df.filter(pl.col("Initialization").eq("Constant Velocity")),
         ax=ax,
         x="Trajectory",
         y="percent",
         hue="Dataset",
-        style="Dewarp",
-        markers=["s", "X", "o"],
-        style_order=["None", "Constant Velocity", "IMU"],
+        style="Features",
+        style_order=features,
+        markers=[
+            "s",
+            "X",
+            # "P",
+            "o",
+        ],
         dashes=False,
         legend=True,
+        palette=palette,
     )
-    # blank line for the legend
-    ax.plot(np.NaN, np.NaN, "-", color="none", label=" ")
 
     # Reorder the legend to put blank one in the right spot
     handles, labels = ax.get_legend_handles_labels()
-    handles.insert(4, handles.pop(-1))
-    labels.insert(4, labels.pop(-1))
+    handles = handles[-len(features) :]
+    labels = labels[-len(features) :]
 
     ax.legend().set_visible(False)
-    ax.tick_params(axis="x", pad=-1, rotation=90)
-    ax.tick_params(axis="y", pad=-1)
+    ax.set_ylabel(r"$\text{RTEt}_{10}$ Change (%)", labelpad=3)
 
-    ax.set_ylabel("Percent Improvement", labelpad=3)
+    traj = df.select("Trajectory").unique().to_numpy()
+    xmax = len(traj) - 1
+    extra = 1.0
+    ax.tick_params(axis="x", pad=-3, rotation=90, labelsize=7)
+    ax.tick_params(axis="y", pad=-2.4)
+    ax.set_xlim(0.0 - extra, xmax + extra)
+    ax.set_ylim(-60, 150.0)
 
-    fig.legend(
+    leg = fig.legend(
         handles=handles,
         labels=labels,
         ncol=3,
-        loc="outside lower center",
+        borderpad=0.2,
+        labelspacing=0.15,
+        loc="outside upper left",
+        columnspacing=4.75,
+        bbox_to_anchor=(0.1055, 1.11),
+    ).get_frame()
+    leg.set_boxstyle("square")  # type: ignore
+    leg.set_linewidth(1.0)
+    plt_show(f"{name}_feature_comp")
+
+
+def plot_point_init(name: str, force: bool):
+    df = compute_cache_stats(dir, force=force)
+
+    # compute percent improvement
+    metric = "w100_RTEr"
+    df = df.with_columns(percent=pl.zeros(df.shape[0]))
+
+    features = [
+        # Plot with this showing that it's very very sensitive to initialization
+        # Show raw values for this one?? along with planar values as a comparison??
+        "Planar",
+        "Planar, Edge",
+        # "Planar, Point",
+        "Point",
+        # "PointAll",
+    ]
+
+    for feature in features:
+        for dataset in df["dataset"].unique():
+            filter = pl.col("dataset").eq(dataset) & pl.col("Features").eq(feature)
+            # Get value of trajectory, feature, and id init
+            id_val = df.filter(filter & pl.col("Initialization").eq("Identity"))[
+                0, metric
+            ]
+            df = df.with_columns(
+                percent=pl.when(filter)
+                # THIS IS THE LINE THAT ACTUALLY COMPUTES THINGS
+                .then(100 * (pl.col(metric) - id_val) / id_val)
+                .otherwise(pl.col("percent"))
+            )
+
+    df = df.filter(pl.col("Features").is_in(features))
+
+    palette = setup_plot()
+    fig, ax = plt.subplots(
+        1,
+        1,
+        figsize=(COL_WIDTH + 0.5, 2.0),
+        layout="constrained",
+        sharey=True,
+        sharex=True,
     )
-    plt_show(FIGURE_DIR / f"{name}.png")
+
+    sns.lineplot(
+        df.filter(pl.col("Initialization").eq("Constant Velocity")),
+        ax=ax,
+        x="Trajectory",
+        y="percent",
+        hue="Dataset",
+        style="Features",
+        style_order=features,
+        markers=[
+            "s",
+            "X",
+            # "P",
+            "o",
+        ],
+        dashes=False,
+        legend=True,
+        palette=palette,
+    )
+
+    # Reorder the legend to put blank one in the right spot
+    handles, labels = ax.get_legend_handles_labels()
+    handles = handles[-len(features) :]
+    labels = labels[-len(features) :]
+
+    ax.legend().set_visible(False)
+    ax.set_ylabel(r"$\text{RTEt}_{10}$ Change (%)", labelpad=3)
+
+    traj = df.select("Trajectory").unique().to_numpy()
+    xmax = len(traj) - 1
+    extra = 1.0
+    ax.tick_params(axis="x", pad=-3, rotation=90, labelsize=7)
+    ax.tick_params(axis="y", pad=-2.4)
+    ax.set_xlim(0.0 - extra, xmax + extra)
+
+    leg = fig.legend(
+        handles=handles,
+        labels=labels,
+        ncol=3,
+        borderpad=0.2,
+        labelspacing=0.15,
+        loc="outside upper left",
+        columnspacing=4.75,
+        bbox_to_anchor=(0.1055, 1.13),
+    ).get_frame()
+    leg.set_boxstyle("square")  # type: ignore
+    leg.set_linewidth(1.0)
+    plt_show(f"{name}_point_init")
 
 
 if __name__ == "__main__":
-    args = parser("dewarp")
+    args = parser("features")
 
     if args.action == "run":
         run(args.num_threads)
     elif args.action == "plot":
-        plot(args.name, args.force)
+        # plot_point_init(args.name, args.force)
+        plot_feature_comp(args.name, args.force)

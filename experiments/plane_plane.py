@@ -12,9 +12,7 @@ from stats import compute_cache_stats
 from env import ALL_TRAJ, LEN, RESULTS_DIR, COL_WIDTH
 
 # ------------------------- Everything to sweep over ------------------------- #
-# TODO: Rerun with ground truth
-# dir = RESULTS_DIR / "25.02.20_plane_plane"
-dir = RESULTS_DIR / "25.02.18_plane_plane_cv"
+dir = RESULTS_DIR / "25.02.21_plane_plane"
 
 
 def run(num_threads: int):

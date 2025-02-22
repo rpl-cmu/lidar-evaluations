@@ -90,8 +90,8 @@ def is_remote() -> bool:
 
 
 def plt_show(name: str):
-    plt.savefig(FIGURE_DIR / f"{name}.png", dpi=300)
-    plt.savefig(GRAPHICS_DIR / f"{name}.pdf", dpi=300)
+    plt.savefig(FIGURE_DIR / f"{name}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(GRAPHICS_DIR / f"{name}.pdf", dpi=300, bbox_inches="tight")
     if not is_remote():
         plt.show()
 

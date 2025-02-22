@@ -265,7 +265,6 @@ def eval_dataset(
 
     results = []
     for exp in experiments:
-        # TODO: sse or mean here?
         window100_rte = exp.windowed_rte(100).sse()
         window200_rte = exp.windowed_rte(200).sse()
         windowdist4_rte = exp.distance_wrte(2.0).sse()

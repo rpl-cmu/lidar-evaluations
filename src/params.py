@@ -19,6 +19,8 @@ class Feature(PrettyPrintEnum):
     Point = 0
     Edge = 1
     Planar = 2
+    PointAll = 3
+    PlanarAll = 4
 
 
 class Initialization(PrettyPrintEnum):
@@ -61,6 +63,12 @@ class ExperimentParams:
     def __post_init__(self):
         # Make sure features are valid
         assert len(self.features) > 0, "At least one feature must be selected"
+        assert not (self.point_all and len(self.features) > 1), (
+            "PointAll cannot be combined with other features"
+        )
+        assert not (self.planar_all and len(self.features) > 1), (
+            "PlanarAll cannot be combined with other features"
+        )
         # Make sure dataset is valid
         DatasetBuilder.parse(self.dataset)
 
@@ -75,6 +83,14 @@ class ExperimentParams:
     @property
     def planar(self):
         return Feature.Planar in self.features
+
+    @property
+    def point_all(self):
+        return Feature.PointAll in self.features
+
+    @property
+    def planar_all(self):
+        return Feature.PlanarAll in self.features
 
     def feature_params(self) -> loam.FeatureExtractionParams:
         feat_params = loam.FeatureExtractionParams()

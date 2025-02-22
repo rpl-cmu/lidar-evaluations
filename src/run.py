@@ -71,7 +71,7 @@ def run(
             num = len(list(file))
         # We run for 4 lines short of the full dataset due to needing curr_gt, prev_gt, prev_prev_gt, etc
         # We increase this to 20 just for good measure (likely to stop within 10 of the finish)
-        if num > length - 20:
+        if num > length - 40:
             return
 
     # Setup progress bar
@@ -175,6 +175,25 @@ def run(
             curr_feat.edge_points = []
         if not ep.point:
             curr_feat.point_points = []
+
+        if ep.point_all:
+            before = fp.curvature_type
+            fp.curvature_type = loam.Curvature.EIGEN
+            valid = loam.computeValidPoints(pts, lp, fp)
+            fp.curvature_type = before
+            assert len(valid) == len(pts)
+            curr_feat.planar_points = []
+            curr_feat.edge_points = []
+            curr_feat.point_points = [p for p, v in zip(pts, valid) if v]
+        elif ep.planar_all:
+            before = fp.curvature_type
+            fp.curvature_type = loam.Curvature.EIGEN
+            valid = loam.computeValidPoints(pts, lp, fp)
+            fp.curvature_type = before
+            assert len(valid) == len(pts)
+            curr_feat.edge_points = []
+            curr_feat.point_points = []
+            curr_feat.planar_points = [p for p, v in zip(pts, valid) if v]
 
         # Skip if we don't have everything we need
         if prev_feat is None:
@@ -294,19 +313,19 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "helipr/kaist_05"
+    dataset = "newer_college_2020/01_short_experiment"
 
     eps = [
         params.ExperimentParams(
-            name="original",
+            name="after",
             dataset=dataset,
-            init=params.Initialization.GroundTruth,
+            init=params.Initialization.ConstantVelocity,
             dewarp=params.Dewarp.Identity,
-            features=[params.Feature.Edge],
+            features=[params.Feature.Planar],
         )
     ]
 
-    directory = Path("results/25.02.19_helipr_edge_center")
+    directory = Path("results/25.02.20_verify_features_same")
     length = 500
     multithreaded = False
 
