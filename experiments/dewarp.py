@@ -12,7 +12,7 @@ from stats import compute_cache_stats
 from env import ALL_TRAJ, LEN, RESULTS_DIR, COL_WIDTH
 
 
-dir = RESULTS_DIR / "25.02.18_dewarp_with_edges_cv_init"
+dir = RESULTS_DIR / "25.02.18_dewarp_with_edges"
 
 
 def run(num_threads: int):
@@ -77,13 +77,8 @@ def plot(name: str, force: bool):
         dashes=False,
         legend=True,
     )
-    # blank line for the legend
-    # ax.plot(np.NaN, np.NaN, "-", color="none", label=" ")
-
     # Reorder the legend to put blank one in the right spot
     handles, labels = ax.get_legend_handles_labels()
-    # handles.insert(5, handles.pop(-1))
-    # labels.insert(5, labels.pop(-1))
     handles = handles[-3:]
     labels = labels[-3:]
 

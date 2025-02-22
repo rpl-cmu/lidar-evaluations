@@ -228,6 +228,7 @@ def run_multithreaded(
             total=len(eps),
             position=0,
             desc="Experiments",
+            smoothing=0.0,
             leave=True,
             dynamic_ncols=True,
         ):

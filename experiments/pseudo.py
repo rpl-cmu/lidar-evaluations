@@ -10,7 +10,7 @@ from params import ExperimentParams, Feature, Initialization
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
-from env import RESULTS_DIR, SUBSET_TRAJ, LEN
+from env import RESULTS_DIR, SUBSET_TRAJ, LEN, COL_WIDTH
 
 dir = RESULTS_DIR / "25.02.18_pseudo_plane"
 
@@ -49,14 +49,21 @@ def plot(name: str, force: bool):
         "Newer College Multi-Cam",
         "Multi-Campus",
         "Oxford Spires",
-        "Botanic Garden",
+        # "Botanic Garden",
         # "Hilti 2022",
     ]
 
     df = compute_cache_stats(dir, force=force)
     df = df.filter(pl.col("Dataset").is_in(good))
 
-    fig, ax = plt.subplots(1, 1, figsize=(5, 3), layout="constrained", sharey=True)
+    fig, ax = plt.subplots(
+        1,
+        1,
+        figsize=(COL_WIDTH + 0.5, 2.0),
+        layout="constrained",
+        sharey=False,
+        sharex=True,
+    )
     sns.lineplot(
         df,
         ax=ax,
@@ -69,29 +76,29 @@ def plot(name: str, force: bool):
         dashes=False,
         palette=palette,
     )
-    # blank line for the legend
-    new_handles = [4, 5, 8, 9]
-    for _ in new_handles:
-        ax.plot(np.NaN, np.NaN, "-", color="none", label=" ")
     # Reorder the legend to put blank one in the right spot
     handles, labels = ax.get_legend_handles_labels()
-    for i in new_handles:
-        handles.insert(i, handles.pop(-1))
-        labels.insert(i, labels.pop(-1))
+    handles = handles[-4:]
+    labels = labels[-4:]
 
     ax.tick_params(axis="x", pad=-1)
     ax.tick_params(axis="y", pad=-1)
     ax.set_xlabel(r"$\epsilon$", labelpad=1)
-    ax.set_ylabel(r"$RTEt_{10}\ (m)$", labelpad=1)
+    ax.set_ylabel(r"$RTEt_{10}\ (m)$", labelpad=2)
     ax.legend().set_visible(False)
 
-    fig.legend(
+    leg = fig.legend(
         handles=handles,
         labels=labels,
-        ncol=3,
-        loc="outside lower center",
+        ncol=2,
+        borderpad=0.2,
         labelspacing=0.15,
-    )
+        loc="outside upper left",
+        columnspacing=10.6,
+        bbox_to_anchor=(0.07, 1.20),
+    ).get_frame()
+    leg.set_boxstyle("square")  # type: ignore
+    leg.set_linewidth(1.0)
     plt_show(name)
 
 

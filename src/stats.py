@@ -435,6 +435,15 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             .alias("Planar Type")
         )
 
+        curv_pretty_names = {
+            "Loam": "Classic",
+            "Eigen": "Scanline-Eigen",
+            "Eigen_NN": "NN-Eigen",
+        }
+        df = df.with_columns(
+            pl.col("curvature").replace(curv_pretty_names).alias("Curvature")
+        )
+
         df = df.rename({"features": "Features"})
 
         # ------------------------- Rename other columns ------------------------- #
