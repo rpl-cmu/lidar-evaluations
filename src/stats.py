@@ -190,6 +190,10 @@ class ExperimentResult:
         with open(path) as file:
             metadata_filter = filter(lambda row: row[0] == "#", file)
             metadata_list = [row[1:].strip() for row in metadata_filter]
+            # remove the last row if it's a comment
+            if metadata_list[-1] == "done":
+                metadata_list.pop(-1)
+            # remove the column information row
             metadata_list.pop(-1)
             metadata_str = "\n".join(metadata_list)
             # remove the header rows

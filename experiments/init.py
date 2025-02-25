@@ -10,7 +10,7 @@ from stats import compute_cache_stats
 from run_init import run_multithreaded
 from wrappers import plt_show, parser, setup_plot
 
-dir = RESULTS_DIR / "25.02.17_init_all"
+dir = RESULTS_DIR / "25.02.24_init_all"
 
 
 def run(num_threads: int):
@@ -28,7 +28,7 @@ def run(num_threads: int):
             # this doesn't actually matter at all
             features=[Feature.Planar],
         )
-        for i, d in product(init, ALL_TRAJ)
+        for d, i in product(ALL_TRAJ, init)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)

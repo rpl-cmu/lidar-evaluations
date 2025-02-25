@@ -11,7 +11,7 @@ import params
 from convert import convert
 from evalio.types import SE3, SO3, LidarMeasurement
 from loam import Pose3d
-from wrappers import GroundTruthIterator, ImuPoseLoader, Rerun, Writer
+from wrappers import StampIterator, ImuPoseLoader, Rerun, Writer
 
 
 mutex = Lock()
@@ -40,12 +40,19 @@ def run(
     length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
 ):
+    # Check if this has been run to completion
+    if ep.output_file(directory).exists():
+        with open(ep.output_file(directory), "r") as f:
+            lines = f.readlines()
+            if len(lines) > 0 and lines[-1] == "# done":
+                return
+
     # Load the data
     dataset = ep.build_dataset()
     # Load ground truth in lidar frame
     gt = dataset.ground_truth()
     gt.transform_in_place(dataset.imu_T_lidar())
-    gt = GroundTruthIterator(gt)
+    gt = StampIterator(gt.stamps, gt.poses)
     # Load integrated imu data
     imu = ImuPoseLoader(dataset)
 
@@ -58,16 +65,6 @@ def run(
     data_iter = iter(dataset)
     if length is None or (length is not None and length > len(data_iter)):  # type:ignore
         length = len(data_iter)  # type:ignore
-
-    # Check if this has been run to completion
-    if ep.output_file(directory).exists():
-        with open(ep.output_file(directory), "r") as f:
-            file = filter(lambda row: row[0] != "#", f)
-            num = len(list(file))
-        # We run for 4 lines short of the full dataset due to needing curr_gt, prev_gt, prev_prev_gt, etc
-        # We increase this to 20 just for good measure (likely to stop within 10 of the finish)
-        if num > length - 20:
-            return
 
     # Setup progress bar
     pbar_params = {
@@ -104,6 +101,9 @@ def run(
         # Get ground truth and skip if we don't have all of them
         curr_gt = gt.next(mm.stamp)
         if curr_gt is None:
+            # Reset everything if there's no ground truth
+            prev_gt = None
+            prev_prev_gt = None
             continue
         if prev_gt is None:
             prev_gt = curr_gt

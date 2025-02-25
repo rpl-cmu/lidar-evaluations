@@ -22,10 +22,9 @@ def run(num_threads: int):
     features = [list(f) for f in features]
     features = [
         # The main ones we'll use
-        # [Feature.Point], # already did
+        # [Feature.Point],
         # [Feature.Planar],
         # [Feature.Planar, Feature.Edge],
-        #
         # [Feature.Planar, Feature.Point],
         #
         # Try just for kicks
@@ -34,6 +33,7 @@ def run(num_threads: int):
         # This is just for research purposes... I wonder how adding "bad" planar points actually impacts things
         [Feature.PlanarAll],
         #
+        # Probably not as important, don't think many people use these
         # [Feature.Planar, Feature.Point],
         # [Feature.Planar, Feature.Edge, Feature.Point],
         # [Feature.Edge],

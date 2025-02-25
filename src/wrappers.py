@@ -1,7 +1,7 @@
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional, TypeVar, cast, Generic
 
 from evalio.datasets.base import Dataset
 import numpy as np
@@ -10,7 +10,7 @@ import rerun.blueprint as rrb
 from serde.yaml import to_yaml
 
 import loam
-from evalio.types import SE3, SO3, LidarMeasurement, Stamp, Trajectory
+from evalio.types import SE3, SO3, LidarMeasurement, Stamp
 from params import ExperimentParams
 from env import FIGURE_DIR, GRAPHICS_DIR, INC_DATA_DIR
 
@@ -120,28 +120,35 @@ class NavState:
         self.trans = trans
 
 
+T = TypeVar("T")
+
+
 @dataclass
-class GroundTruthIterator:
-    traj: Trajectory
+class StampIterator(Generic[T]):
+    stamps: list[Stamp]
+    objects: list[T]
     idx: int = 0
 
-    def next(self, stamp: Stamp, tol: float = 1e-2) -> Optional[SE3]:
+    def next(self, stamp: Stamp, tol: float = 0.05) -> Optional[T]:
         # If our first ground truth is in the future, we'll have to skip for a bit
-        if self.idx >= len(self.traj):
-            return None
-        elif self.traj.stamps[self.idx] > stamp:
+        if self.idx >= len(self.objects):
             return None
 
-        while (
-            self.idx < len(self.traj.stamps)
-            and self.traj.stamps[self.idx] - stamp < -tol
-        ):
+        while self.idx < len(self.stamps) and self.stamps[self.idx] < stamp:
             self.idx += 1
 
-        if self.idx >= len(self.traj):
+        if self.idx >= len(self.stamps):
+            return None
+
+        # Choose the closer of the two nearest timestamps
+        if abs(self.stamps[self.idx - 1] - stamp) < abs(self.stamps[self.idx] - stamp):
+            self.idx -= 1
+
+        # make sure gt is within half a scan
+        if abs(self.stamps[self.idx] - stamp) > tol:
             return None
         else:
-            return self.traj.poses[self.idx]
+            return self.objects[self.idx]
 
 
 class ImuPoseLoader:
@@ -151,7 +158,9 @@ class ImuPoseLoader:
         self.seq = dataset.seq
 
         filename = (
-            INC_DATA_DIR / "imu_integration" / f"{dataset.name()}_{dataset.seq}.pkl"
+            INC_DATA_DIR
+            / "imu_integration_backup"
+            / f"{dataset.name()}_{dataset.seq}.pkl"
         )
         self.imu_T_lidar = dataset.imu_T_lidar()
 
@@ -260,6 +269,7 @@ class Writer:
         )
 
     def close(self):
+        self.file.write("# done")
         self.file.close()
         self.debug.close()
 

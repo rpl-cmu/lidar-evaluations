@@ -16,6 +16,6 @@ compile_commands.json
 
 # misc
 .vscode/
-results/
+results*
 graphics
 data*

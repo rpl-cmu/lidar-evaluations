@@ -33,7 +33,7 @@ from gtsam.symbol_shorthand import X, V, B  # type: ignore
 from tqdm import tqdm
 
 from env import ALL_TRAJ, INC_DATA_DIR, LEN
-from wrappers import NavState
+from wrappers import NavState, StampIterator
 
 
 @dataclass(kw_only=True)
@@ -231,30 +231,21 @@ def integrate_along_lidarscans(
     gravity: np.ndarray,
 ) -> list[tuple[Stamp, list[NavState]]]:
     results = []
-    imu_idx = 1
-    opt_idx = 0
+    opt_iterator = StampIterator(
+        opt_result.stamps, [i for i in range(len(opt_result.stamps))]
+    )
+    imu_iterator = StampIterator(
+        [i.stamp for i in imu_data], [i for i in range(len(imu_data))]
+    )
     for i, stamp in enumerate(lidar_stamps):
-        if imu_idx >= len(imu_data):
-            continue
-        elif opt_idx >= len(opt_result.stamps):
-            continue
-        # Skip lidar scans if they are before the first optimized pose
-        elif stamp < opt_result.stamps[opt_idx]:
+        opt_idx = opt_iterator.next(stamp)
+        imu_idx = imu_iterator.next(stamp)
+
+        if opt_idx is None or imu_idx is None:
             continue
 
-        # get closest imu data and ground truth pose
-        while imu_idx < len(imu_data) and imu_data[imu_idx].stamp < stamp:
-            imu_idx += 1
-        while (
-            opt_idx < len(opt_result.stamps)
-            and opt_result.stamps[opt_idx] - stamp < -1e-2
-        ):
-            opt_idx += 1
-
-        if imu_idx >= len(imu_data):
-            continue
-        elif opt_idx >= len(opt_result.stamps):
-            continue
+        # print(stamp, "Lidar")
+        # print(opt_result.stamps[opt_idx], "Opt")
 
         # Get initialization
         init = NavState(
@@ -275,6 +266,7 @@ def integrate_along_lidarscans(
         this_results = [deepcopy(init)]
         while imu_idx < len(imu_data) and imu_data[imu_idx].stamp < next_stamp:
             imu = imu_data[imu_idx]
+            # print(imu.stamp, "Imu")
 
             # Update and save
             init.update(
@@ -363,7 +355,6 @@ def test(name: str, length: Optional[int] = None):
     )
 
     import matplotlib.pyplot as plt
-    from wrappers import plt_show
 
     # Plot biases to make sure they're changing
     fig, ax = plt.subplots(3, 2, layout="constrained")
@@ -372,7 +363,7 @@ def test(name: str, length: Optional[int] = None):
     for i in range(3):
         ax[i, 0].plot(stamps, opt_result.gyro_bias[:, i])
         ax[i, 1].plot(stamps, opt_result.accel_bias[:, i])
-    plt_show("figures/biases.png")
+    plt.savefig("figures/biases.png")
 
     # Ballpark how many imu measurements to plot
     opt_rate = len(opt_result.stamps) / (opt_result.stamps[-1] - opt_result.stamps[0])
@@ -394,7 +385,7 @@ def test(name: str, length: Optional[int] = None):
 
     ax.scatter(x, y, s=1, alpha=0.5, label="Integrated")
     ax.legend()
-    plt_show("figures/integrated_poses.png")
+    plt.savefig("figures/integrated_poses.png")
 
 
 if __name__ == "__main__":
@@ -405,5 +396,5 @@ if __name__ == "__main__":
     for name in ALL_TRAJ:
         run(name, out_dir=INC_DATA_DIR, force=False, length=LEN)
 
-    # test("helipr/kaist_05", length=500)
-    # run("botanic_garden/1005_00", out_dir=Path("data_temp"), force=True, length=3000)
+    # test("hilti_2022/basement_2", length=500)
+    # run("hilti_2022/basement_2", out_dir=Path("data_temp"), force=True, length=3000)

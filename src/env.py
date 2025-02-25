@@ -1,6 +1,6 @@
 from pathlib import Path
 
-RESULTS_DIR = Path("./results")
+RESULTS_DIR = Path("./results_final")
 FIGURE_DIR = Path("./figures")
 GRAPHICS_DIR = Path("./graphics")
 INC_DATA_DIR = Path("./data")

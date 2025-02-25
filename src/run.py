@@ -11,7 +11,7 @@ import params
 from convert import convert
 from evalio.types import SE3, SO3, LidarMeasurement, Stamp
 from loam import Pose3d
-from wrappers import GroundTruthIterator, ImuPoseLoader, Rerun, Writer
+from wrappers import StampIterator, ImuPoseLoader, Rerun, Writer
 
 
 mutex = Lock()
@@ -40,12 +40,19 @@ def run(
     length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
 ):
+    # Check if this has been run to completion
+    if ep.output_file(directory).exists():
+        with open(ep.output_file(directory), "r") as f:
+            lines = f.readlines()
+            if len(lines) > 0 and lines[-1] == "# done":
+                return
+
     # Load the data
     dataset = ep.build_dataset()
     # Load ground truth in lidar frame
     gt = dataset.ground_truth()
     gt.transform_in_place(dataset.imu_T_lidar())
-    gt = GroundTruthIterator(gt)
+    gt = StampIterator(gt.stamps, gt.poses)
     # Load integrated imu data
     imu = ImuPoseLoader(dataset)
 
@@ -64,22 +71,13 @@ def run(
     if length is None or (length is not None and length > len(data_iter)):  # type:ignore
         length = len(data_iter)  # type:ignore
 
-    # Check if this has been run to completion
-    if ep.output_file(directory).exists():
-        with open(ep.output_file(directory), "r") as f:
-            file = filter(lambda row: row[0] != "#", f)
-            num = len(list(file))
-        # We run for 4 lines short of the full dataset due to needing curr_gt, prev_gt, prev_prev_gt, etc
-        # We increase this to 20 just for good measure (likely to stop within 10 of the finish)
-        if num > length - 40:
-            return
-
     # Setup progress bar
     pbar_params = {
         "total": length,  # type: ignore
         "dynamic_ncols": True,
         "leave": True,
         "desc": f"[{ep.short_info()}]",
+        # "disable": True,
     }
     pbar_idx = None
     if multithreaded_info is not None:
@@ -114,6 +112,11 @@ def run(
         # Get ground truth and skip if we don't have all of them
         curr_gt = gt.next(mm.stamp)
         if curr_gt is None:
+            # Reset everything if there's no ground truth
+            prev_gt = None
+            prev_feat = None
+            prev_stamp = None
+            prev_prev_gt = None
             continue
         if prev_gt is None:
             prev_gt = curr_gt
@@ -313,11 +316,11 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "newer_college_2020/01_short_experiment"
+    dataset = "botanic_garden/1005_00"
 
     eps = [
         params.ExperimentParams(
-            name="after",
+            name="check_2.5",
             dataset=dataset,
             init=params.Initialization.ConstantVelocity,
             dewarp=params.Dewarp.Identity,
@@ -325,12 +328,12 @@ if __name__ == "__main__":
         )
     ]
 
-    directory = Path("results/25.02.20_verify_features_same")
-    length = 500
+    directory = Path("results/25.02.24_botanic_garden_check")
+    length = 1000
     multithreaded = False
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
         for e in eps:
-            run(e, directory, visualize=False, length=length)
+            run(e, directory, visualize=True, length=length)
