@@ -158,9 +158,7 @@ class ImuPoseLoader:
         self.seq = dataset.seq
 
         filename = (
-            INC_DATA_DIR
-            / "imu_integration_backup"
-            / f"{dataset.name()}_{dataset.seq}.pkl"
+            INC_DATA_DIR / "imu_integration" / f"{dataset.name()}_{dataset.seq}.pkl"
         )
         self.imu_T_lidar = dataset.imu_T_lidar()
 

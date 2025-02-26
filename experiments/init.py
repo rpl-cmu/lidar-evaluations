@@ -10,7 +10,7 @@ from stats import compute_cache_stats
 from run_init import run_multithreaded
 from wrappers import plt_show, parser, setup_plot
 
-dir = RESULTS_DIR / "25.02.24_init_all"
+dir = RESULTS_DIR / "25.02.25_init"
 
 
 def run(num_threads: int):

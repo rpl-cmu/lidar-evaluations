@@ -12,7 +12,7 @@ from stats import compute_cache_stats
 from env import ALL_TRAJ, LEN, RESULTS_DIR, COL_WIDTH
 
 
-dir = RESULTS_DIR / "25.02.18_dewarp_with_edges"
+dir = RESULTS_DIR / "25.02.25_dewarp"
 
 
 def run(num_threads: int):

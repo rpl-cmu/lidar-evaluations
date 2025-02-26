@@ -172,13 +172,23 @@ def run(
         curr_feat = loam.extractFeatures(pts, lp, fp)
         if not ep.planar:
             curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
+            curr_feat.point_scan_indices = (
+                curr_feat.point_scan_indices + curr_feat.planar_scan_indices
+            )
             curr_feat.planar_points = []
+            curr_feat.planar_scan_indices = []
         if not ep.edge:
             curr_feat.point_points = curr_feat.point_points + curr_feat.edge_points
+            curr_feat.point_scan_indices = (
+                curr_feat.point_scan_indices + curr_feat.edge_scan_indices
+            )
             curr_feat.edge_points = []
+            curr_feat.edge_scan_indices = []
         if not ep.point:
             curr_feat.point_points = []
+            curr_feat.point_scan_indices = []
 
+        # TODO: If I ever use these I need to fill out the scan indices as well
         if ep.point_all:
             before = fp.curvature_type
             fp.curvature_type = loam.Curvature.EIGEN
@@ -211,7 +221,9 @@ def run(
             step_pose = loam.registerFeatures(
                 curr_feat, prev_feat, init, params=rp, detail=detail
             )
+            # print(len(detail.iteration_info[-1].plane_associations))
             step_pose = convert(step_pose)
+            # quit()
 
             # Also skipping iter_gt to not compound bad results if failed
             iter_gt = iter_gt * step_gt
@@ -316,24 +328,38 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "botanic_garden/1005_00"
+    dataset = "multi_campus_2024/tuhh_day_04"
 
     eps = [
         params.ExperimentParams(
-            name="check_2.5",
+            name="testing",
             dataset=dataset,
-            init=params.Initialization.ConstantVelocity,
+            init=params.Initialization.GroundTruth,
             dewarp=params.Dewarp.Identity,
             features=[params.Feature.Planar],
-        )
+        ),
+        # params.ExperimentParams(
+        #     name="min_0.5_cv",
+        #     dataset=dataset,
+        #     init=params.Initialization.GroundTruth,
+        #     dewarp=params.Dewarp.ConstantVelocity,
+        #     features=[params.Feature.Planar, params.Feature.Edge],
+        # ),
+        # params.ExperimentParams(
+        #     name="min_0.5_imu",
+        #     dataset=dataset,
+        #     init=params.Initialization.GroundTruth,
+        #     dewarp=params.Dewarp.Imu,
+        #     features=[params.Feature.Planar, params.Feature.Edge],
+        # ),
     ]
 
-    directory = Path("results/25.02.24_botanic_garden_check")
-    length = 1000
+    directory = Path("results/25.02.25_multi_gt")
+    length = 3000
     multithreaded = False
 
     if multithreaded:
         run_multithreaded(eps, directory, length=length)
     else:
         for e in eps:
-            run(e, directory, visualize=True, length=length)
+            run(e, directory, visualize=False, length=length)

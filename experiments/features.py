@@ -6,32 +6,31 @@ import sys
 
 sys.path.append("src")
 from params import ExperimentParams, Feature, Initialization
-from wrappers import parser, plt_show, setup_plot, powerset
+from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
 from stats import compute_cache_stats
 from env import ALL_TRAJ, COL_WIDTH, LEN, RESULTS_DIR
 
 # dir = RESULTS_DIR / "25.02.17_features"
 # dir = RESULTS_DIR / "25.02.19_features"
-dir = RESULTS_DIR / "25.02.20_features_pointall_fixed"
+dir = RESULTS_DIR / "25.02.25_features"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
-    features = powerset([Feature.Planar, Feature.Edge, Feature.Point])
-    features = [list(f) for f in features]
     features = [
         # The main ones we'll use
-        # [Feature.Point],
-        # [Feature.Planar],
-        # [Feature.Planar, Feature.Edge],
+        [Feature.Planar],
+        [Feature.Planar, Feature.Edge],
+        [Feature.Point],
+        #
         # [Feature.Planar, Feature.Point],
         #
         # Try just for kicks
-        [Feature.PointAll],
+        # [Feature.PointAll],
         #
         # This is just for research purposes... I wonder how adding "bad" planar points actually impacts things
-        [Feature.PlanarAll],
+        # [Feature.PlanarAll],
         #
         # Probably not as important, don't think many people use these
         # [Feature.Planar, Feature.Point],
@@ -53,8 +52,6 @@ def run(num_threads: int):
             name=f"{'_'.join([str(f) for f in feats])}_{i}",
             dataset=d,
             features=feats,
-            use_plane_to_plane=False,
-            # curvature=Curvature.Eigen,
             init=i,
         )
         for (feats, i, d) in product(features, init, ALL_TRAJ)
@@ -254,5 +251,5 @@ if __name__ == "__main__":
     if args.action == "run":
         run(args.num_threads)
     elif args.action == "plot":
-        # plot_point_init(args.name, args.force)
+        plot_point_init(args.name, args.force)
         plot_feature_comp(args.name, args.force)

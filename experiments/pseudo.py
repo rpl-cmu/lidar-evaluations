@@ -12,7 +12,7 @@ from run import run_multithreaded
 from stats import compute_cache_stats
 from env import RESULTS_DIR, SUBSET_TRAJ, LEN, COL_WIDTH
 
-dir = RESULTS_DIR / "25.02.18_pseudo_plane"
+dir = RESULTS_DIR / "25.02.25_pseudo_plane"
 
 
 def run(num_threads: int):
@@ -26,6 +26,8 @@ def run(num_threads: int):
 
     epsilon = np.linspace(0.0, 1.0, 11)
 
+    datasets = [d for d in SUBSET_TRAJ if ("new" in d or "oxford" in d or "multi" in d)]
+
     # ------------------------- Computer product of options ------------------------- #
     experiments = [
         ExperimentParams(
@@ -35,7 +37,7 @@ def run(num_threads: int):
             pseudo_planar_epsilon=float(val),
             init=i,
         )
-        for i, val, d in product(init, epsilon, SUBSET_TRAJ)
+        for i, val, d in product(init, epsilon, datasets)
     ]
 
     run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)

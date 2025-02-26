@@ -14,8 +14,7 @@ from wrappers import plt_show, parser, setup_plot
 from dataclasses import asdict
 from env import COL_WIDTH, LEN, RESULTS_DIR, SUBSET_TRAJ
 
-# weird date, but this is the right one
-dir = RESULTS_DIR / "25.02.21_window"
+dir = RESULTS_DIR / "25.02.25_window_final"
 
 
 def run(num_threads: int):

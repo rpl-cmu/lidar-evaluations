@@ -1,12 +1,11 @@
 from itertools import product
-from pathlib import Path
 import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
 import sys
 
 sys.path.append("src")
-from env import ALL_TRAJ, LEN, COL_WIDTH
+from env import ALL_TRAJ, LEN, COL_WIDTH, RESULTS_DIR
 from params import Curvature, ExperimentParams, Feature, Initialization
 from wrappers import parser, plt_show, setup_plot
 from run import run_multithreaded
@@ -20,7 +19,7 @@ Changelog
 
 """
 
-dir = Path("results/25.02.20_curvature_7.0")
+dir = RESULTS_DIR / "25.02.25_curvature_new_nn"
 
 
 def run(num_threads: int):

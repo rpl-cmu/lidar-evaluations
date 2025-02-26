@@ -12,7 +12,7 @@ from stats import compute_cache_stats
 from env import ALL_TRAJ, LEN, RESULTS_DIR, COL_WIDTH
 
 # ------------------------- Everything to sweep over ------------------------- #
-dir = RESULTS_DIR / "25.02.21_plane_plane"
+dir = RESULTS_DIR / "25.02.24_plane_plane_test_removal"
 
 
 def run(num_threads: int):
