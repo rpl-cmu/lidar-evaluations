@@ -56,7 +56,7 @@ def plot(name: str, force: bool):
     fig, ax = plt.subplots(
         1,
         1,
-        figsize=(COL_WIDTH + 0.5, 2.0),
+        figsize=(COL_WIDTH + 0.5, 1.7),
         layout="constrained",
         sharey=False,
         sharex=True,
@@ -97,8 +97,8 @@ def plot(name: str, force: bool):
         borderpad=0.2,
         labelspacing=0.15,
         loc="outside upper left",
-        columnspacing=9.9,
-        bbox_to_anchor=(0.1055, 1.13),
+        columnspacing=9.85,
+        bbox_to_anchor=(0.1055, 1.17),
     ).get_frame()
     leg.set_boxstyle("square")  # type: ignore
     leg.set_linewidth(1.0)

@@ -101,7 +101,7 @@ def plot(name: str, force: bool):
         labelspacing=0.15,
         loc="outside upper left",
         columnspacing=4.0,
-        bbox_to_anchor=(0.105, 1.12),
+        bbox_to_anchor=(0.106, 1.122),
     ).get_frame()
     leg.set_boxstyle("square")  # type: ignore
     leg.set_linewidth(1.0)

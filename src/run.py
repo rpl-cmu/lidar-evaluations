@@ -221,9 +221,7 @@ def run(
             step_pose = loam.registerFeatures(
                 curr_feat, prev_feat, init, params=rp, detail=detail
             )
-            # print(len(detail.iteration_info[-1].plane_associations))
             step_pose = convert(step_pose)
-            # quit()
 
             # Also skipping iter_gt to not compound bad results if failed
             iter_gt = iter_gt * step_gt
@@ -328,33 +326,18 @@ def run_multithreaded(
 
 
 if __name__ == "__main__":
-    dataset = "multi_campus_2024/tuhh_day_04"
+    dataset = "oxford_spires/blenheim_palace_05"
 
     eps = [
         params.ExperimentParams(
-            name="testing",
+            name="cv",
             dataset=dataset,
-            init=params.Initialization.GroundTruth,
-            dewarp=params.Dewarp.Identity,
-            features=[params.Feature.Planar],
-        ),
-        # params.ExperimentParams(
-        #     name="min_0.5_cv",
-        #     dataset=dataset,
-        #     init=params.Initialization.GroundTruth,
-        #     dewarp=params.Dewarp.ConstantVelocity,
-        #     features=[params.Feature.Planar, params.Feature.Edge],
-        # ),
-        # params.ExperimentParams(
-        #     name="min_0.5_imu",
-        #     dataset=dataset,
-        #     init=params.Initialization.GroundTruth,
-        #     dewarp=params.Dewarp.Imu,
-        #     features=[params.Feature.Planar, params.Feature.Edge],
-        # ),
+            init=params.Initialization.ConstantVelocity,
+            features=[params.Feature.Planar, params.Feature.Edge],
+        )
     ]
 
-    directory = Path("results/25.02.25_multi_gt")
+    directory = Path("results/25.02.27_oxford_test")
     length = 3000
     multithreaded = False
 
@@ -362,4 +345,4 @@ if __name__ == "__main__":
         run_multithreaded(eps, directory, length=length)
     else:
         for e in eps:
-            run(e, directory, visualize=False, length=length)
+            run(e, directory, visualize=True, length=length)

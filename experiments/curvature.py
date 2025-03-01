@@ -117,8 +117,8 @@ def plot_classic(name: str, force: bool):
         borderpad=0.2,
         labelspacing=0.15,
         loc="outside upper left",
-        columnspacing=3.35,
-        bbox_to_anchor=(0.09, 1.155),
+        columnspacing=3.3,
+        bbox_to_anchor=(0.091, 1.155),
     ).get_frame()
     leg.set_boxstyle("square")  # type: ignore
     leg.set_linewidth(1.0)

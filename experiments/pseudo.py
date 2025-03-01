@@ -24,7 +24,7 @@ def run(num_threads: int):
         Initialization.GroundTruth,
     ]
 
-    epsilon = np.linspace(0.0, 1.0, 11)
+    epsilon: list[float] = np.linspace(0.0, 1.0, 11).tolist()
 
     datasets = [d for d in SUBSET_TRAJ if ("new" in d or "oxford" in d or "multi" in d)]
 
@@ -46,29 +46,25 @@ def run(num_threads: int):
 def plot(name: str, force: bool):
     palette = setup_plot()
 
-    good = [
-        "Newer College Stereo-Cam",
-        "Newer College Multi-Cam",
-        "Multi-Campus",
-        "Oxford Spires",
-        # "Botanic Garden",
-        # "Hilti 2022",
-    ]
+    first = "Newer College Stereo-Cam"
+    second = "Multi-Campus"
+    # first = "Oxford Spires"
+    # first = "Newer College Multi-Cam"
 
     df = compute_cache_stats(dir, force=force)
-    df = df.filter(pl.col("Dataset").is_in(good))
+    # df = df.filter(pl.col("Initialization").eq("Constant Velocity"))
 
     fig, ax = plt.subplots(
         1,
-        1,
-        figsize=(COL_WIDTH + 0.5, 2.0),
+        2,
+        figsize=(COL_WIDTH + 0.5, 1.3),
         layout="constrained",
-        sharey=False,
-        sharex=True,
+        sharey=True,
+        sharex=False,
     )
     sns.lineplot(
-        df,
-        ax=ax,
+        df.filter(pl.col("Dataset").eq(first)),
+        ax=ax[0],
         x="pseudo_planar_epsilon",
         y="w100_RTEt",
         hue="Dataset",
@@ -78,16 +74,33 @@ def plot(name: str, force: bool):
         dashes=False,
         palette=palette,
     )
+    sns.lineplot(
+        df.filter(pl.col("Dataset").eq(second)),
+        ax=ax[1],
+        x="pseudo_planar_epsilon",
+        y="w100_RTEt",
+        hue="Dataset",
+        style="Initialization",
+        markers=["s", "X", "o", "P"],
+        style_order=["Identity", "Constant Velocity", "IMU", "Ground Truth"],
+        dashes=False,
+        palette=palette,
+        legend=False,
+    )
+
     # Reorder the legend to put blank one in the right spot
-    handles, labels = ax.get_legend_handles_labels()
+    handles, labels = ax[0].get_legend_handles_labels()
     handles = handles[-4:]
     labels = labels[-4:]
 
-    ax.tick_params(axis="x", pad=-1)
-    ax.tick_params(axis="y", pad=-1)
-    ax.set_xlabel(r"$\epsilon$", labelpad=1)
-    ax.set_ylabel(r"$RTEt_{10}\ (m)$", labelpad=2)
-    ax.legend().set_visible(False)
+    # ax[0].set_yscale("log")
+
+    for i in range(2):
+        ax[i].tick_params(axis="x", pad=-2)
+        ax[i].tick_params(axis="y", pad=-1)
+        ax[i].set_xlabel(r"$\epsilon$", labelpad=0)
+    ax[0].set_ylabel(r"$RTEt_{10}\ (m)$", labelpad=2)
+    ax[0].legend().set_visible(False)
 
     leg = fig.legend(
         handles=handles,
@@ -97,7 +110,7 @@ def plot(name: str, force: bool):
         labelspacing=0.15,
         loc="outside upper left",
         columnspacing=10.6,
-        bbox_to_anchor=(0.07, 1.20),
+        bbox_to_anchor=(0.072, 1.32),
     ).get_frame()
     leg.set_boxstyle("square")  # type: ignore
     leg.set_linewidth(1.0)

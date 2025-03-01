@@ -64,7 +64,7 @@ def plot_feature_comp(name: str, force: bool):
     df = compute_cache_stats(dir, force=force)
 
     # compute percent improvement
-    metric = "w100_RTEr"
+    metric = "w100_RTEt"
     df = df.with_columns(percent=pl.zeros(df.shape[0]))
 
     features = [
@@ -97,7 +97,7 @@ def plot_feature_comp(name: str, force: bool):
     fig, ax = plt.subplots(
         1,
         1,
-        figsize=(COL_WIDTH + 0.5, 2.0),
+        figsize=(COL_WIDTH + 0.5, 1.85),
         layout="constrained",
         sharey=True,
         sharex=True,
@@ -128,7 +128,7 @@ def plot_feature_comp(name: str, force: bool):
     labels = labels[-len(features) :]
 
     ax.legend().set_visible(False)
-    ax.set_ylabel(r"$\text{RTEt}_{10}$ Change (%)", labelpad=3)
+    ax.set_ylabel(r"$\text{RTEt}_{10}$ Change (%)", labelpad=0)
 
     traj = df.select("Trajectory").unique().to_numpy()
     xmax = len(traj) - 1
@@ -136,7 +136,11 @@ def plot_feature_comp(name: str, force: bool):
     ax.tick_params(axis="x", pad=-3, rotation=90, labelsize=7)
     ax.tick_params(axis="y", pad=-2.4)
     ax.set_xlim(0.0 - extra, xmax + extra)
-    ax.set_ylim(-60, 150.0)
+    ax.set_yscale("symlog", linthresh=100.0, linscale=1.0)
+    ax.set_ylim(-120, 700)
+    # set custom axis ticks
+    ticks = [-100, 0, 100, 500]
+    ax.set_yticks(ticks, [str(t) for t in ticks])
 
     leg = fig.legend(
         handles=handles,
@@ -145,8 +149,8 @@ def plot_feature_comp(name: str, force: bool):
         borderpad=0.2,
         labelspacing=0.15,
         loc="outside upper left",
-        columnspacing=4.75,
-        bbox_to_anchor=(0.1055, 1.11),
+        columnspacing=4.78,
+        bbox_to_anchor=(0.103, 1.145),
     ).get_frame()
     leg.set_boxstyle("square")  # type: ignore
     leg.set_linewidth(1.0)
@@ -157,7 +161,7 @@ def plot_point_init(name: str, force: bool):
     df = compute_cache_stats(dir, force=force)
 
     # compute percent improvement
-    metric = "w100_RTEr"
+    metric = "w100_RTEt"
     df = df.with_columns(percent=pl.zeros(df.shape[0]))
 
     features = [
@@ -190,7 +194,7 @@ def plot_point_init(name: str, force: bool):
     fig, ax = plt.subplots(
         1,
         1,
-        figsize=(COL_WIDTH + 0.5, 2.0),
+        figsize=(COL_WIDTH + 0.5, 1.85),
         layout="constrained",
         sharey=True,
         sharex=True,
@@ -238,7 +242,7 @@ def plot_point_init(name: str, force: bool):
         labelspacing=0.15,
         loc="outside upper left",
         columnspacing=4.75,
-        bbox_to_anchor=(0.1055, 1.13),
+        bbox_to_anchor=(0.1055, 1.15),
     ).get_frame()
     leg.set_boxstyle("square")  # type: ignore
     leg.set_linewidth(1.0)

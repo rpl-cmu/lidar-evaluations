@@ -426,6 +426,7 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             "Identity": "Identity",
             "ConstantVelocity": "Constant Velocity",
             "Imu": "IMU",
+            "GroundTruth": "Ground Truth",
         }
         df = df.with_columns(
             pl.col("init").replace(init_pretty_names).alias("Initialization")

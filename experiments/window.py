@@ -120,7 +120,7 @@ def plot(name: str, force: bool):
     else:
         df = pl.read_csv(df_file)
 
-    fig, ax = plt.subplots(1, 1, figsize=(COL_WIDTH + 0.5, 1.75), layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(COL_WIDTH + 0.5, 1.55), layout="constrained")
     sns.lineplot(
         df,
         x="window",
