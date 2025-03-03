@@ -1,7 +1,7 @@
 [project]
-name = "lidar-features"
+name = "lidar_eval"
 version = "0.1.0"
-description = "Add your description here"
+description = "Evaluation of common lidar odometry techniques on a variety of datasets"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -25,10 +25,11 @@ evalio = { workspace = true }
 loam = { workspace = true }
 
 [tool.uv.workspace]
-members = ["evalio", "loam"]
+members = ["src/evalio", "src/loam"]
 
 [dependency-groups]
-dev = [
-    "compdb>=0.2.0",
-    "pybind11-stubgen>=2.5.1",
-]
+dev = ["compdb>=0.2.0", "pybind11-stubgen>=2.5.1"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

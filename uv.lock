@@ -8,7 +8,7 @@ resolution-markers = [
 [manifest]
 members = [
     "evalio",
-    "lidar-features",
+    "lidar-eval",
     "loam",
 ]
 
@@ -287,7 +287,7 @@ wheels = [
 [[package]]
 name = "evalio"
 version = "0.1.0"
-source = { editable = "evalio" }
+source = { editable = "src/evalio" }
 dependencies = [
     { name = "argcomplete" },
     { name = "numpy" },
@@ -551,9 +551,9 @@ wheels = [
 ]
 
 [[package]]
-name = "lidar-features"
+name = "lidar-eval"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "evalio" },
     { name = "gdown" },
@@ -578,11 +578,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "evalio", editable = "evalio" },
+    { name = "evalio", editable = "src/evalio" },
     { name = "gdown", specifier = ">=5.2.0" },
     { name = "gtsam", specifier = ">=4.2" },
     { name = "ipython", specifier = ">=8.32.0" },
-    { name = "loam", editable = "loam" },
+    { name = "loam", editable = "src/loam" },
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "polars", specifier = ">=1.21.0" },
     { name = "pyqt6", specifier = ">=6.8.0" },
@@ -602,7 +602,7 @@ dev = [
 [[package]]
 name = "loam"
 version = "0.1.0"
-source = { editable = "loam" }
+source = { editable = "src/loam" }
 dependencies = [
     { name = "numpy" },
 ]

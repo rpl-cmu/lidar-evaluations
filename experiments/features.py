@@ -2,48 +2,35 @@ from itertools import product
 import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
-import sys
 
-sys.path.append("src")
-from params import ExperimentParams, Feature, Initialization
-from wrappers import parser, plt_show, setup_plot
-from run import run_multithreaded
-from stats import compute_cache_stats
-from env import ALL_TRAJ, COL_WIDTH, LEN, RESULTS_DIR
+from lidar_eval.params import ExperimentParams, Feature, Initialization
+from lidar_eval.run import run_multithreaded
+from lidar_eval.stats import compute_cache_stats, eval
+from env import (
+    INC_DATA_DIR,
+    RESULTS_DIR,
+    ALL_TRAJ,
+    LEN,
+    COL_WIDTH,
+    parser,
+    plt_show,
+    setup_plot,
+)
 
-# dir = RESULTS_DIR / "25.02.17_features"
-# dir = RESULTS_DIR / "25.02.19_features"
 dir = RESULTS_DIR / "25.02.25_features"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
     features = [
-        # The main ones we'll use
         [Feature.Planar],
         [Feature.Planar, Feature.Edge],
         [Feature.Point],
-        #
-        # [Feature.Planar, Feature.Point],
-        #
-        # Try just for kicks
-        # [Feature.PointAll],
-        #
-        # This is just for research purposes... I wonder how adding "bad" planar points actually impacts things
-        # [Feature.PlanarAll],
-        #
-        # Probably not as important, don't think many people use these
-        # [Feature.Planar, Feature.Point],
-        # [Feature.Planar, Feature.Edge, Feature.Point],
-        # [Feature.Edge],
-        # [Feature.Edge, Feature.Point],
     ]
 
     init = [
         Initialization.Identity,
         Initialization.ConstantVelocity,
-        # Initialization.Imu,
-        # Initialization.GroundTruth,
     ]
 
     # ------------------------- Compute product of options ------------------------- #
@@ -57,7 +44,9 @@ def run(num_threads: int):
         for (feats, i, d) in product(features, init, ALL_TRAJ)
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
+    run_multithreaded(
+        experiments, dir, INC_DATA_DIR, num_threads=num_threads, length=LEN
+    )
 
 
 def plot_feature_comp(name: str, force: bool):
@@ -254,6 +243,8 @@ if __name__ == "__main__":
 
     if args.action == "run":
         run(args.num_threads)
+    elif args.action == "stats":
+        eval([dir])
     elif args.action == "plot":
         plot_point_init(args.name, args.force)
         plot_feature_comp(args.name, args.force)

@@ -1,17 +1,17 @@
 from functools import partial
 from multiprocessing import Manager, Pool, Lock
 from pathlib import Path
-from typing import Optional, Sequence, cast
+from typing import Optional, Sequence
 
 import numpy as np
 from tqdm import tqdm
 
 import loam
-import params
-from convert import convert
-from evalio.types import SE3, SO3, LidarMeasurement, Stamp
+from lidar_eval import params
+from lidar_eval.convert import convert
+from evalio.types import SE3, SO3, LidarMeasurement
 from loam import Pose3d
-from wrappers import StampIterator, ImuPoseLoader, Rerun, Writer
+from lidar_eval.wrappers import StampIterator, ImuPoseLoader, Rerun, Writer
 
 
 mutex = Lock()
@@ -35,6 +35,7 @@ def release_pgb_pos(shared_list, slot):
 def run(
     ep: params.ExperimentParams,
     directory: Path,
+    extra_data: Path,
     multithreaded_info: Optional[list] = None,
     visualize: bool = False,
     length: Optional[int] = None,
@@ -54,17 +55,12 @@ def run(
     gt.transform_in_place(dataset.imu_T_lidar())
     gt = StampIterator(gt.stamps, gt.poses)
     # Load integrated imu data
-    imu = ImuPoseLoader(dataset)
+    imu = ImuPoseLoader(dataset, extra_data)
 
     # Create visualizer
     rr = None
     if visualize:
         rr = Rerun(to_hide=["pose/points", "pose/features/*"], ip=ip)
-
-    # params
-    lp = convert(dataset.lidar_params())
-    fp = ep.feature_params()
-    rp = ep.registration_params()
 
     # Get length of dataset
     data_iter = iter(dataset)
@@ -77,7 +73,6 @@ def run(
         "dynamic_ncols": True,
         "leave": True,
         "desc": f"[{ep.short_info()}]",
-        # "disable": True,
     }
     pbar_idx = None
     if multithreaded_info is not None:
@@ -94,8 +89,6 @@ def run(
     # Setup everything for running
     idx = 0
 
-    prev_stamp = None
-    prev_feat = None
     prev_gt = None
     prev_prev_gt = None
 
@@ -106,26 +99,19 @@ def run(
         if not isinstance(mm, LidarMeasurement):
             continue
 
-        pts = mm.to_vec_positions()
-        pts_stamps = mm.to_vec_stamps()
-
         # Get ground truth and skip if we don't have all of them
         curr_gt = gt.next(mm.stamp)
         if curr_gt is None:
             # Reset everything if there's no ground truth
             prev_gt = None
-            prev_feat = None
-            prev_stamp = None
             prev_prev_gt = None
             continue
         if prev_gt is None:
             prev_gt = curr_gt
-            prev_stamp = mm.stamp
             continue
         if prev_prev_gt is None:
             prev_prev_gt = prev_gt
             prev_gt = curr_gt
-            prev_stamp = mm.stamp
             continue
 
         # get imu init and integrated poses - skip if we don't have it
@@ -147,81 +133,9 @@ def run(
             case _:
                 raise ValueError("Unknown initialization")
 
-        # Deskew
-        match ep.dewarp:
-            case params.Dewarp.Identity:
-                pass
-            case params.Dewarp.ConstantVelocity:
-                dt = mm.stamp - cast(Stamp, prev_stamp)
-                delta = prev_prev_gt.inverse() * prev_gt
-                vel_trans = delta.trans / dt
-                vel_rot = delta.rot.log() / dt
-                pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
-            case params.Dewarp.GroundTruthConstantVelocity:
-                dt = mm.stamp - cast(Stamp, prev_stamp)
-                delta = prev_gt.inverse() * curr_gt
-                vel_trans = delta.trans / dt
-                vel_rot = delta.rot.log() / dt
-                pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
-            case params.Dewarp.Imu:
-                pts = loam.deskewImu(pts, pts_stamps, imu_poses, imu_stamps)
-            case _:
-                raise ValueError("Unknown dewarping")
-
-        # Get features and ground truth
-        curr_feat = loam.extractFeatures(pts, lp, fp)
-        if not ep.planar:
-            curr_feat.point_points = curr_feat.point_points + curr_feat.planar_points
-            curr_feat.point_scan_indices = (
-                curr_feat.point_scan_indices + curr_feat.planar_scan_indices
-            )
-            curr_feat.planar_points = []
-            curr_feat.planar_scan_indices = []
-        if not ep.edge:
-            curr_feat.point_points = curr_feat.point_points + curr_feat.edge_points
-            curr_feat.point_scan_indices = (
-                curr_feat.point_scan_indices + curr_feat.edge_scan_indices
-            )
-            curr_feat.edge_points = []
-            curr_feat.edge_scan_indices = []
-        if not ep.point:
-            curr_feat.point_points = []
-            curr_feat.point_scan_indices = []
-
-        # TODO: If I ever use these I need to fill out the scan indices as well
-        if ep.point_all:
-            before = fp.curvature_type
-            fp.curvature_type = loam.Curvature.EIGEN
-            valid = loam.computeValidPoints(pts, lp, fp)
-            fp.curvature_type = before
-            assert len(valid) == len(pts)
-            curr_feat.planar_points = []
-            curr_feat.edge_points = []
-            curr_feat.point_points = [p for p, v in zip(pts, valid) if v]
-        elif ep.planar_all:
-            before = fp.curvature_type
-            fp.curvature_type = loam.Curvature.EIGEN
-            valid = loam.computeValidPoints(pts, lp, fp)
-            fp.curvature_type = before
-            assert len(valid) == len(pts)
-            curr_feat.edge_points = []
-            curr_feat.point_points = []
-            curr_feat.planar_points = [p for p, v in zip(pts, valid) if v]
-
-        # Skip if we don't have everything we need
-        if prev_feat is None:
-            prev_feat = curr_feat
-            prev_prev_gt = prev_gt
-            prev_gt = curr_gt
-            prev_stamp = mm.stamp
-            continue
-
         try:
             detail = loam.RegistrationDetail()
-            step_pose = loam.registerFeatures(
-                curr_feat, prev_feat, init, params=rp, detail=detail
-            )
-            step_pose = convert(step_pose)
+            step_pose: SE3 = convert(init)  # type: ignore
 
             # Also skipping iter_gt to not compound bad results if failed
             iter_gt = iter_gt * step_gt
@@ -231,7 +145,6 @@ def run(
                 rr.log("gt", iter_gt)
                 rr.log("pose", iter_est)
                 rr.log("pose/points", mm)
-                rr.log("pose/features", curr_feat)
 
                 # compute metrics to send as well
                 delta = step_gt.inverse() * step_pose
@@ -250,7 +163,7 @@ def run(
 
             # Save results
             # Saving deltas for now - maybe switch to trajectories later
-            writer.write(mm.stamp, step_pose, step_gt, curr_feat, detail)
+            writer.write(mm.stamp, step_pose, step_gt, loam.LoamFeatures(), detail)
 
         except Exception as e:
             writer.error("Registration failed, replacing with nan")
@@ -264,8 +177,6 @@ def run(
 
         prev_prev_gt = prev_gt
         prev_gt = curr_gt
-        prev_stamp = mm.stamp
-        prev_feat = curr_feat
 
         if length is not None and idx >= length:
             break
@@ -280,6 +191,7 @@ def run(
 def run_multithreaded(
     eps: Sequence[params.ExperimentParams],
     directory: Path,
+    extra_data: Path,
     visualize: bool = False,
     length: Optional[int] = None,
     ip: str = "0.0.0.0:9876",
@@ -308,6 +220,7 @@ def run_multithreaded(
                 partial(
                     run,
                     directory=directory,
+                    extra_data=extra_data,
                     multithreaded_info=shared_list,  # type:ignore
                     length=length,
                     visualize=visualize,
@@ -318,31 +231,8 @@ def run_multithreaded(
             total=len(eps),
             position=0,
             desc="Experiments",
+            smoothing=0.0,
             leave=True,
             dynamic_ncols=True,
-            smoothing=0.0,
         ):
             pass
-
-
-if __name__ == "__main__":
-    dataset = "oxford_spires/blenheim_palace_05"
-
-    eps = [
-        params.ExperimentParams(
-            name="cv",
-            dataset=dataset,
-            init=params.Initialization.ConstantVelocity,
-            features=[params.Feature.Planar, params.Feature.Edge],
-        )
-    ]
-
-    directory = Path("results/25.02.27_oxford_test")
-    length = 3000
-    multithreaded = False
-
-    if multithreaded:
-        run_multithreaded(eps, directory, length=length)
-    else:
-        for e in eps:
-            run(e, directory, visualize=True, length=length)

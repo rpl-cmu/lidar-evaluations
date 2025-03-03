@@ -3,16 +3,22 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
-import sys
 import polars as pl
 
-sys.path.append("src")
-from params import ExperimentParams, Feature, Initialization
-from stats import ExperimentResult
-from run import run_multithreaded
-from wrappers import plt_show, parser, setup_plot
+from lidar_eval.params import ExperimentParams, Feature, Initialization
+from lidar_eval.stats import ExperimentResult, eval
+from lidar_eval.run import run_multithreaded
 from dataclasses import asdict
-from env import COL_WIDTH, LEN, RESULTS_DIR, SUBSET_TRAJ
+from env import (
+    COL_WIDTH,
+    INC_DATA_DIR,
+    LEN,
+    RESULTS_DIR,
+    SUBSET_TRAJ,
+    plt_show,
+    parser,
+    setup_plot,
+)
 
 dir = RESULTS_DIR / "25.02.25_window_final"
 
@@ -28,7 +34,9 @@ def run(num_threads: int):
         for d in SUBSET_TRAJ
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
+    run_multithreaded(
+        experiments, dir, INC_DATA_DIR, num_threads=num_threads, length=LEN
+    )
 
 
 def split_dataset_to_seq(df: pl.DataFrame) -> pl.DataFrame:
@@ -147,5 +155,7 @@ if __name__ == "__main__":
 
     if args.action == "run":
         run(args.num_threads)
+    elif args.action == "stats":
+        eval([dir])
     elif args.action == "plot":
         plot(args.name, args.force)

@@ -2,15 +2,20 @@ from itertools import product
 import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
-import sys
 
-sys.path.append("src")
-from params import ExperimentParams, Feature, Initialization, Dewarp
-from wrappers import parser, plt_show, setup_plot
-from run import run_multithreaded
-from stats import compute_cache_stats
-from env import ALL_TRAJ, LEN, RESULTS_DIR, COL_WIDTH
-
+from lidar_eval.params import ExperimentParams, Feature, Initialization, Dewarp
+from lidar_eval.run import run_multithreaded
+from lidar_eval.stats import compute_cache_stats, eval
+from env import (
+    INC_DATA_DIR,
+    RESULTS_DIR,
+    ALL_TRAJ,
+    LEN,
+    COL_WIDTH,
+    parser,
+    plt_show,
+    setup_plot,
+)
 
 dir = RESULTS_DIR / "25.02.25_dewarp"
 
@@ -35,7 +40,9 @@ def run(num_threads: int):
         for (de, d) in product(dewarp, ALL_TRAJ)
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
+    run_multithreaded(
+        experiments, dir, INC_DATA_DIR, num_threads=num_threads, length=LEN
+    )
 
 
 def plot(name: str, force: bool):
@@ -113,5 +120,7 @@ if __name__ == "__main__":
 
     if args.action == "run":
         run(args.num_threads)
+    elif args.action == "stats":
+        eval([dir])
     elif args.action == "plot":
         plot(args.name, args.force)

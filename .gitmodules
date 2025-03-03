@@ -1,6 +1,6 @@
 [submodule "loam"]
-	path = loam
+	path = src/loam
 	url = git@github.com:contagon/loam.git
 [submodule "evalio"]
-	path = evalio
+	path = src/evalio
 	url = git@github.com:contagon/evalio.git

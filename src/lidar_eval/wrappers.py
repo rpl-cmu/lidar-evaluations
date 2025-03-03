@@ -11,89 +11,13 @@ from serde.yaml import to_yaml
 
 import loam
 from evalio.types import SE3, SO3, LidarMeasurement, Stamp
-from params import ExperimentParams
-from env import FIGURE_DIR, GRAPHICS_DIR, INC_DATA_DIR
+from lidar_eval.params import ExperimentParams
 
-import os
-import matplotlib.pyplot as plt
-
-from itertools import chain, combinations
-from convert import convert
-import argparse
-import matplotlib
-import seaborn as sns
-
-
-def setup_plot():
-    matplotlib.rc("pdf", fonttype=42)
-    sns.set_context("paper")
-    sns.set_style("whitegrid")
-    sns.set_palette("colorblind")
-    c = sns.color_palette("colorblind")
-
-    # Make sure you install times & clear matplotlib cache
-    # https://stackoverflow.com/a/49884009
-    plt.rcParams["font.family"] = "Times New Roman"
-    plt.rcParams["mathtext.fontset"] = "stix"
-
-    return {
-        "Newer College Stereo-Cam": c[0],
-        "Newer College Multi-Cam": c[1],
-        "Hilti 2022": c[2],
-        "Oxford Spires": c[3],
-        "Multi-Campus": c[4],
-        "HeLiPR": c[5],
-        "Botanic Garden": c[6],
-    }
-
-
-def parser(name: str) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=f"{name} experiment")
-    subparsers = parser.add_subparsers(dest="action")
-
-    run_parser = subparsers.add_parser("run", help="Run the experiment")
-    run_parser.add_argument(
-        "-n",
-        "--num_threads",
-        type=int,
-        default=20,
-        help="Number of threads to use for multiprocessing",
-    )
-
-    plot_parser = subparsers.add_parser("plot", help="Plot the results")
-    plot_parser.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="Force recomputing results",
-    )
-
-    args = parser.parse_args()
-    args.name = name
-    return args
+from lidar_eval.convert import convert
 
 
 # For handling multiple tqdm progress bars
 # https://stackoverflow.com/questions/56665639/fix-jumping-of-multiple-progress-bars-tqdm-in-python-multiprocessing
-
-
-# https://docs.python.org/3/library/itertools.html#itertools-recipes
-def powerset(iterable):
-    "Subsequences of the iterable from shortest to longest."
-    # powerset([1,2,3]) → () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)
-    s = list(iterable)
-    return list(chain.from_iterable(combinations(s, r) for r in range(1, len(s) + 1)))
-
-
-def is_remote() -> bool:
-    return os.environ.get("SSH_CONNECTION") is not None
-
-
-def plt_show(name: str):
-    plt.savefig(FIGURE_DIR / f"{name}.png", dpi=300, bbox_inches="tight")
-    plt.savefig(GRAPHICS_DIR / f"{name}.pdf", dpi=300, bbox_inches="tight")
-    if not is_remote():
-        plt.show()
 
 
 @dataclass
@@ -152,13 +76,13 @@ class StampIterator(Generic[T]):
 
 
 class ImuPoseLoader:
-    def __init__(self, dataset: Dataset) -> None:
+    def __init__(self, dataset: Dataset, extra_data: Path) -> None:
         import pickle
 
         self.seq = dataset.seq
 
         filename = (
-            INC_DATA_DIR / "imu_integration" / f"{dataset.name()}_{dataset.seq}.pkl"
+            extra_data / "imu_integration" / f"{dataset.name()}_{dataset.seq}.pkl"
         )
         self.imu_T_lidar = dataset.imu_T_lidar()
 

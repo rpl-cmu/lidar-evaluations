@@ -1,16 +1,22 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
 from itertools import product
-import sys
 
-sys.path.append("src")
-from env import ALL_TRAJ, COL_WIDTH, LEN, RESULTS_DIR
-from params import ExperimentParams, Feature, Initialization
-from stats import compute_cache_stats
-from run_init import run_multithreaded
-from wrappers import plt_show, parser, setup_plot
+from lidar_eval.params import ExperimentParams, Feature, Initialization
+from lidar_eval.run import run_multithreaded
+from lidar_eval.stats import compute_cache_stats, eval
+from env import (
+    INC_DATA_DIR,
+    RESULTS_DIR,
+    ALL_TRAJ,
+    LEN,
+    COL_WIDTH,
+    parser,
+    plt_show,
+    setup_plot,
+)
 
-dir = RESULTS_DIR / "25.02.25_init"
+dir = RESULTS_DIR / "25.03.03_init"
 
 
 def run(num_threads: int):
@@ -31,7 +37,9 @@ def run(num_threads: int):
         for d, i in product(ALL_TRAJ, init)
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
+    run_multithreaded(
+        experiments, dir, INC_DATA_DIR, num_threads=num_threads, length=LEN
+    )
 
 
 def plot(name: str, force: bool):
@@ -100,5 +108,7 @@ if __name__ == "__main__":
 
     if args.action == "run":
         run(args.num_threads)
+    elif args.action == "stats":
+        eval([dir])
     elif args.action == "plot":
         plot(args.name, args.force)

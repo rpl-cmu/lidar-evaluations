@@ -10,8 +10,8 @@ from tabulate import tabulate
 import polars as pl
 
 from evalio.types import SE3, SO3, Stamp
-from params import ExperimentParams, Feature
-from wrappers import Rerun
+from lidar_eval.params import ExperimentParams, Feature
+from lidar_eval.wrappers import Rerun
 
 
 @dataclass(kw_only=True)
@@ -270,23 +270,14 @@ def eval_dataset(
     results = []
     for exp in experiments:
         window100_rte = exp.windowed_rte(100).sse()
-        window200_rte = exp.windowed_rte(200).sse()
-        windowdist4_rte = exp.distance_wrte(2.0).sse()
-        # rte = exp.rte().sse()
-        # ate = exp.ate().sse()
+        rte = exp.rte().sse()
         r = asdict(exp.params)
         r.update(
             {
-                "w200_RTEt": window200_rte.trans,
-                "w200_RTEr": window200_rte.rot,
                 "w100_RTEt": window100_rte.trans,
                 "w100_RTEr": window100_rte.rot,
-                "w4_RTEt": windowdist4_rte.trans,
-                "w4_RTEr": windowdist4_rte.rot,
-                # "RTEt": rte.trans,
-                # "RTEr": rte.rot,
-                # "ATEt": ate.trans,
-                # "ATEr": ate.rot,
+                "RTEt": rte.trans,
+                "RTEr": rte.rot,
                 "point": exp.get_feature(Feature.Point).mean(),
                 "edge": exp.get_feature(Feature.Edge).mean(),
                 "planar": exp.get_feature(Feature.Planar).mean(),
@@ -328,8 +319,7 @@ def _contains_dir(directory: Path) -> bool:
     return any(directory.is_dir() for directory in directory.glob("*"))
 
 
-def eval(directories: list[Path], visualize: bool, sort: Optional[str] = None):
-    # TODO: Make this cache things as well
+def eval(directories: list[Path], visualize: bool = False, sort: Optional[str] = None):
     # Collect all bottom level directories
     bottom_level_dirs = []
     for directory in directories:

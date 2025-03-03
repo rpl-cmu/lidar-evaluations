@@ -32,8 +32,7 @@ from gtsam.imuBias import ConstantBias  # type: ignore
 from gtsam.symbol_shorthand import X, V, B  # type: ignore
 from tqdm import tqdm
 
-from env import ALL_TRAJ, INC_DATA_DIR, LEN
-from wrappers import NavState, StampIterator
+from lidar_eval.wrappers import NavState, StampIterator
 
 
 @dataclass(kw_only=True)
@@ -386,15 +385,3 @@ def test(name: str, length: Optional[int] = None):
     ax.scatter(x, y, s=1, alpha=0.5, label="Integrated")
     ax.legend()
     plt.savefig("figures/integrated_poses.png")
-
-
-if __name__ == "__main__":
-    # run("hilti_2022/basement_2", force=True)
-    # test("hilti_2022/basement_2")
-    # quit()
-
-    for name in ALL_TRAJ:
-        run(name, out_dir=INC_DATA_DIR, force=False, length=LEN)
-
-    # test("hilti_2022/basement_2", length=500)
-    # run("hilti_2022/basement_2", out_dir=Path("data_temp"), force=True, length=3000)

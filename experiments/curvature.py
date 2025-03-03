@@ -2,14 +2,20 @@ from itertools import product
 import seaborn as sns
 import matplotlib.pyplot as plt
 import polars as pl
-import sys
 
-sys.path.append("src")
-from env import ALL_TRAJ, LEN, COL_WIDTH, RESULTS_DIR
-from params import Curvature, ExperimentParams, Feature, Initialization
-from wrappers import parser, plt_show, setup_plot
-from run import run_multithreaded
-from stats import compute_cache_stats
+from env import (
+    ALL_TRAJ,
+    INC_DATA_DIR,
+    LEN,
+    COL_WIDTH,
+    RESULTS_DIR,
+    parser,
+    plt_show,
+    setup_plot,
+)
+from lidar_eval.params import Curvature, ExperimentParams, Feature, Initialization
+from lidar_eval.run import run_multithreaded
+from lidar_eval.stats import compute_cache_stats, eval
 
 """
 Test for the effect of curvature computations methods
@@ -19,7 +25,7 @@ Changelog
 
 """
 
-dir = RESULTS_DIR / "25.02.25_curvature_new_nn"
+dir = RESULTS_DIR / "25.02.25_rand"
 
 
 def run(num_threads: int):
@@ -43,7 +49,9 @@ def run(num_threads: int):
         for c, d in product(curvatures, ALL_TRAJ)
     ]
 
-    run_multithreaded(experiments, dir, num_threads=num_threads, length=LEN)
+    run_multithreaded(
+        experiments, dir, INC_DATA_DIR, num_threads=num_threads, length=LEN
+    )
 
 
 def plot_classic(name: str, force: bool):
@@ -130,5 +138,7 @@ if __name__ == "__main__":
 
     if args.action == "run":
         run(args.num_threads)
+    elif args.action == "stats":
+        eval([dir])
     elif args.action == "plot":
         plot_classic(args.name, args.force)
