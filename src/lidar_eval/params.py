@@ -32,9 +32,9 @@ class Initialization(PrettyPrintEnum):
 
 class Dewarp(PrettyPrintEnum):
     Identity = 0
-    ConstantVelocity = 1
+    ConstantVelocityStart = 1
     Imu = 2
-    GroundTruthConstantVelocity = 3
+    ConstantVelocityEnd = 3
 
 
 class Curvature(PrettyPrintEnum):

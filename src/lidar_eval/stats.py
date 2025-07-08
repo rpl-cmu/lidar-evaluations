@@ -363,7 +363,7 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             "newer_college_2021": "Newer College Multi-Cam",
             "hilti_2022": "Hilti 2022",
             "oxford_spires": "Oxford Spires",
-            "multi_campus_2024": "Multi-Campus",
+            "multi_campus": "Multi-Campus",
             "helipr": "HeLiPR",
             "botanic_garden": "Botanic Garden",
         }
@@ -405,7 +405,8 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
         # ------------------------- Cleanup various names ------------------------- #
         dewarp_pretty_names = {
             "Identity": "None",
-            "ConstantVelocity": "Constant Velocity",
+            "ConstantVelocityStart": "Constant Velocity (Start)",
+            "ConstantVelocityEnd": "Constant Velocity (End)",
             "Imu": "IMU",
         }
         df = df.with_columns(

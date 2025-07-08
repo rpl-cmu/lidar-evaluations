@@ -17,14 +17,15 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.02.25_dewarp"
+dir = RESULTS_DIR / "25.07.07_dewarp"
 
 
 def run(num_threads: int):
     # ------------------------- Everything to sweep over ------------------------- #
     dewarp = [
         Dewarp.Identity,
-        Dewarp.ConstantVelocity,
+        Dewarp.ConstantVelocityStart,
+        Dewarp.ConstantVelocityEnd,
         Dewarp.Imu,
     ]
 
@@ -80,7 +81,12 @@ def plot(name: str, force: bool):
         hue="Dataset",
         style="Dewarp",
         markers=["s", "X", "o"],
-        style_order=["None", "Constant Velocity", "IMU"],
+        style_order=[
+            "None",
+            "Constant Velocity (Start)",
+            "Constant Velocity (End)",
+            # "IMU",
+        ],
         dashes=False,
         legend=True,
     )

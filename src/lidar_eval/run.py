@@ -152,13 +152,13 @@ def run(
         match ep.dewarp:
             case params.Dewarp.Identity:
                 pass
-            case params.Dewarp.ConstantVelocity:
+            case params.Dewarp.ConstantVelocityStart:
                 dt = mm.stamp - cast(Stamp, prev_stamp)
                 delta = prev_prev_gt.inverse() * prev_gt
                 vel_trans = delta.trans / dt
                 vel_rot = delta.rot.log() / dt
                 pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
-            case params.Dewarp.GroundTruthConstantVelocity:
+            case params.Dewarp.ConstantVelocityEnd:
                 dt = mm.stamp - cast(Stamp, prev_stamp)
                 delta = prev_gt.inverse() * curr_gt
                 vel_trans = delta.trans / dt
