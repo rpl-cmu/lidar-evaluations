@@ -167,9 +167,9 @@ def plot_point_init(name: str, force: bool):
         for dataset in df["dataset"].unique():
             filter = pl.col("dataset").eq(dataset) & pl.col("Features").eq(feature)
             # Get value of trajectory, feature, and id init
-            id_val = df.filter(filter & pl.col("Initialization").eq("Identity"))[
-                0, metric
-            ]
+            id_val = df.filter(
+                filter & pl.col("Initialization").eq("Constant Velocity")
+            )[0, metric]
             df = df.with_columns(
                 percent=pl.when(filter)
                 # THIS IS THE LINE THAT ACTUALLY COMPUTES THINGS
@@ -190,7 +190,7 @@ def plot_point_init(name: str, force: bool):
     )
 
     sns.lineplot(
-        df.filter(pl.col("Initialization").eq("Constant Velocity")),
+        df.filter(pl.col("Initialization").eq("Identity")),
         ax=ax,
         x="Trajectory",
         y="percent",
