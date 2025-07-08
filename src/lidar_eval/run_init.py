@@ -63,9 +63,8 @@ def run(
         rr = Rerun(to_hide=["pose/points", "pose/features/*"], ip=ip)
 
     # Get length of dataset
-    data_iter = iter(dataset)
-    if length is None or (length is not None and length > len(data_iter)):  # type:ignore
-        length = len(data_iter)  # type:ignore
+    if length is None or (length is not None and length > len(dataset)):  # type:ignore
+        length = len(dataset)  # type:ignore
 
     # Setup progress bar
     pbar_params = {
@@ -95,7 +94,7 @@ def run(
     iter_gt = SE3.identity()
     iter_est = SE3.identity()
 
-    for mm in data_iter:
+    for mm in dataset:
         if not isinstance(mm, LidarMeasurement):
             continue
 
@@ -148,16 +147,16 @@ def run(
 
                 # compute metrics to send as well
                 delta = step_gt.inverse() * step_pose
-                error_t = np.sqrt(delta.trans @ delta.trans)
+                error_t = np.sqrt(delta.trans @ delta.trans)  # type:ignore
                 r_diff = delta.rot.log()
-                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi  # type:ignore
                 rr.log("metrics/rte/rot", float(error_r))
                 rr.log("metrics/rte/trans", float(error_t))
 
                 delta = iter_gt.inverse() * iter_est
-                error_t = np.sqrt(delta.trans @ delta.trans)
+                error_t = np.sqrt(delta.trans @ delta.trans)  # type:ignore
                 r_diff = delta.rot.log()
-                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi  # type:ignore
                 rr.log("metrics/ate/rot", float(error_r))
                 rr.log("metrics/ate/trans", float(error_t))
 

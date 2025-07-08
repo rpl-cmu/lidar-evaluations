@@ -5,7 +5,7 @@ description = "Evaluation of common lidar odometry techniques on a variety of da
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "evalio",
+    "evalio>=0.3.0",
     "gdown>=5.2.0",
     "gtsam>=4.2",
     "ipython>=8.32.0",
@@ -21,11 +21,10 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-evalio = { workspace = true }
 loam = { workspace = true }
 
 [tool.uv.workspace]
-members = ["src/evalio", "src/loam"]
+members = ["src/loam"]
 
 [dependency-groups]
 dev = ["compdb>=0.2.0", "pybind11-stubgen>=2.5.1"]
