@@ -17,7 +17,7 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.02.25_features"
+dir = RESULTS_DIR / "25.07.09_features"
 
 
 def run(num_threads: int):

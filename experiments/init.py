@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from itertools import product
 
 from lidar_eval.params import ExperimentParams, Feature, Initialization
-from lidar_eval.run import run_multithreaded
+from lidar_eval.run_init import run_multithreaded
 from lidar_eval.stats import compute_cache_stats, eval
 from env import (
     INC_DATA_DIR,
@@ -16,7 +16,7 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.03.03_init"
+dir = RESULTS_DIR / "25.07.08_init"
 
 
 def run(num_threads: int):

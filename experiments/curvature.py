@@ -25,7 +25,7 @@ Changelog
 
 """
 
-dir = RESULTS_DIR / "25.02.25_rand"
+dir = RESULTS_DIR / "25.07.08_curvature"
 
 
 def run(num_threads: int):

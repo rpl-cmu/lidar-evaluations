@@ -20,7 +20,7 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.02.25_pseudo_plane"
+dir = RESULTS_DIR / "25.07.09_pseudo_plane"
 
 
 def run(num_threads: int):
