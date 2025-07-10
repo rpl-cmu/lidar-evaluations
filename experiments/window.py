@@ -20,7 +20,7 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.07.8_window_final"
+dir = RESULTS_DIR / "25.07.08_window_final"
 
 
 def run(num_threads: int):

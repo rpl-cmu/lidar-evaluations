@@ -369,6 +369,9 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
         }
 
         def short(f: str) -> str:
+            # hack for extra `b` in botanic_garden sequences
+            if f.startswith("b10"):
+                f = f[1:]
             if f.isdigit():
                 return f[-2:]
             else:
