@@ -18,7 +18,7 @@ from env import (
 )
 
 # ------------------------- Everything to sweep over ------------------------- #
-dir = RESULTS_DIR / "25.02.24_plane_plane_test_removal"
+dir = RESULTS_DIR / "25.07.08_plane_plane"
 
 
 def run(num_threads: int):

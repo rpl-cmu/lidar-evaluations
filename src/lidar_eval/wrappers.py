@@ -31,9 +31,9 @@ class NavState:
         self, accel: np.ndarray, gyro: np.ndarray, gravity: np.ndarray, stamp: Stamp
     ) -> None:
         rot_og = self.pose.rot
-        trans_og = self.pose.trans
+        trans_og = cast(np.ndarray, self.pose.trans)
 
-        dt = stamp - self.stamp
+        dt = (stamp - self.stamp).to_sec()
         rot = rot_og * SO3.exp(gyro * dt)
         vel = self.velocity + (rot_og.rotate(accel) + gravity) * dt
         trans = trans_og + vel * dt + 0.5 * (rot_og.rotate(accel) + gravity) * dt**2
@@ -65,11 +65,13 @@ class StampIterator(Generic[T]):
             return None
 
         # Choose the closer of the two nearest timestamps
-        if abs(self.stamps[self.idx - 1] - stamp) < abs(self.stamps[self.idx] - stamp):
+        if abs((self.stamps[self.idx - 1] - stamp).to_sec()) < abs(
+            (self.stamps[self.idx] - stamp).to_sec()
+        ):
             self.idx -= 1
 
         # make sure gt is within half a scan
-        if abs(self.stamps[self.idx] - stamp) > tol:
+        if abs((self.stamps[self.idx] - stamp).to_sec()) > tol:
             return None
         else:
             return self.objects[self.idx]
@@ -79,10 +81,12 @@ class ImuPoseLoader:
     def __init__(self, dataset: Dataset, extra_data: Path) -> None:
         import pickle
 
-        self.seq = dataset.seq
+        self.seq = dataset.seq_name
 
         filename = (
-            extra_data / "imu_integration" / f"{dataset.name()}_{dataset.seq}.pkl"
+            extra_data
+            / "imu_integration"
+            / f"{dataset.dataset_name()}_{dataset.seq_name}.pkl"
         )
         self.imu_T_lidar = dataset.imu_T_lidar()
 
@@ -128,7 +132,7 @@ class ImuPoseLoader:
 
         # Stamps should be dead on
         assert self.data[self.idx][0] == stamp, (
-            f"Stamps don't match in ImuPoseLoader in {self.seq}"
+            f"Stamps don't match in ImuPoseLoader in {self.seq}, {self.data[self.idx][0]} != {stamp}"
         )
 
         # See how far we integrated across the previous timestamp to get to this one
@@ -137,7 +141,9 @@ class ImuPoseLoader:
 
         # Get all the integrated poses taken during this lidar scan
         poses = [convert(p.pose) for p in self.data[self.idx][1]]
-        stamps = [s.stamp - self.data[self.idx][0] for s in self.data[self.idx][1]]
+        stamps = [
+            (s.stamp - self.data[self.idx][0]).to_sec() for s in self.data[self.idx][1]
+        ]
 
         return init, stamps, poses
 
@@ -169,16 +175,16 @@ class Writer:
         self.writer.writerow(
             [
                 stamp.to_sec(),
-                pose.trans[0],
-                pose.trans[1],
-                pose.trans[2],
+                pose.trans[0],  # type: ignore
+                pose.trans[1],  # type: ignore
+                pose.trans[2],  # type: ignore
                 pose.rot.qx,
                 pose.rot.qy,
                 pose.rot.qz,
                 pose.rot.qw,
-                gt.trans[0],
-                gt.trans[1],
-                gt.trans[2],
+                gt.trans[0],  # type: ignore
+                gt.trans[1],  # type: ignore
+                gt.trans[2],  # type: ignore
                 gt.rot.qx,
                 gt.rot.qy,
                 gt.rot.qz,

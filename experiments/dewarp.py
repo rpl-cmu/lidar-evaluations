@@ -17,7 +17,7 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.02.25_dewarp"
+dir = RESULTS_DIR / "25.07.09_dewarp"
 
 
 def run(num_threads: int):

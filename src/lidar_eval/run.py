@@ -68,9 +68,8 @@ def run(
     rp = ep.registration_params()
 
     # Get length of dataset
-    data_iter = iter(dataset)
-    if length is None or (length is not None and length > len(data_iter)):  # type:ignore
-        length = len(data_iter)  # type:ignore
+    if length is None or (length is not None and length > len(dataset)):  # type:ignore
+        length = len(dataset)  # type:ignore
 
     # Setup progress bar
     pbar_params = {
@@ -103,11 +102,11 @@ def run(
     iter_gt = SE3.identity()
     iter_est = SE3.identity()
 
-    for mm in data_iter:
+    for mm in dataset:
         if not isinstance(mm, LidarMeasurement):
             continue
 
-        pts = mm.to_vec_positions()
+        pts = cast(list[np.ndarray], mm.to_vec_positions())
         pts_stamps = mm.to_vec_stamps()
 
         # Get ground truth and skip if we don't have all of them
@@ -153,16 +152,16 @@ def run(
             case params.Dewarp.Identity:
                 pass
             case params.Dewarp.ConstantVelocity:
-                dt = mm.stamp - cast(Stamp, prev_stamp)
+                dt = (mm.stamp - cast(Stamp, prev_stamp)).to_sec()
                 delta = prev_prev_gt.inverse() * prev_gt
-                vel_trans = delta.trans / dt
-                vel_rot = delta.rot.log() / dt
+                vel_trans = cast(np.ndarray, delta.trans) / dt
+                vel_rot = cast(np.ndarray, delta.rot.log()) / dt
                 pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
             case params.Dewarp.GroundTruthConstantVelocity:
-                dt = mm.stamp - cast(Stamp, prev_stamp)
+                dt = (mm.stamp - cast(Stamp, prev_stamp)).to_sec()
                 delta = prev_gt.inverse() * curr_gt
-                vel_trans = delta.trans / dt
-                vel_rot = delta.rot.log() / dt
+                vel_trans = cast(np.ndarray, delta.trans) / dt
+                vel_rot = cast(np.ndarray, delta.rot.log()) / dt
                 pts = loam.deskewConstantVelocity(pts, pts_stamps, vel_rot, vel_trans)
             case params.Dewarp.Imu:
                 pts = loam.deskewImu(pts, pts_stamps, imu_poses, imu_stamps)
@@ -235,16 +234,16 @@ def run(
 
                 # compute metrics to send as well
                 delta = step_gt.inverse() * step_pose
-                error_t = np.sqrt(delta.trans @ delta.trans)
+                error_t = np.sqrt(delta.trans @ delta.trans)  # type:ignore
                 r_diff = delta.rot.log()
-                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi  # type:ignore
                 rr.log("metrics/rte/rot", float(error_r))
                 rr.log("metrics/rte/trans", float(error_t))
 
                 delta = iter_gt.inverse() * iter_est
-                error_t = np.sqrt(delta.trans @ delta.trans)
+                error_t = np.sqrt(delta.trans @ delta.trans)  # type:ignore
                 r_diff = delta.rot.log()
-                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi
+                error_r = np.sqrt(r_diff @ r_diff) * 180 / np.pi  # type:ignore
                 rr.log("metrics/ate/rot", float(error_r))
                 rr.log("metrics/ate/trans", float(error_t))
 

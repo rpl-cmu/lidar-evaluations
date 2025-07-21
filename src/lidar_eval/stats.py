@@ -93,7 +93,7 @@ class ExperimentResult:
         for i, (gt, pose) in enumerate(zip(gts, poses)):
             delta = gt.inverse() * pose
             error_t[i] = delta.trans
-            r_diff = delta.rot.log()
+            r_diff = cast(np.ndarray, delta.rot.log())
             error_r[i] = r_diff * 180 / np.pi
 
         return Error(rot=error_r, trans=error_t)
@@ -363,12 +363,15 @@ def compute_cache_stats(directory: Path, force: bool = False) -> pl.DataFrame:
             "newer_college_2021": "Newer College Multi-Cam",
             "hilti_2022": "Hilti 2022",
             "oxford_spires": "Oxford Spires",
-            "multi_campus_2024": "Multi-Campus",
+            "multi_campus": "Multi-Campus",
             "helipr": "HeLiPR",
             "botanic_garden": "Botanic Garden",
         }
 
         def short(f: str) -> str:
+            # hack for extra `b` in botanic_garden sequences
+            if f.startswith("b10"):
+                f = f[1:]
             if f.isdigit():
                 return f[-2:]
             else:

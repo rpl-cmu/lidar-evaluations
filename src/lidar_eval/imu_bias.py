@@ -9,12 +9,14 @@ from evalio.types import (
     Stamp,
     Trajectory,
 )
-from evalio.cli import DatasetBuilder
+from evalio.cli.parser import DatasetBuilder
 import numpy as np
 from dataclasses import dataclass
 from copy import deepcopy
 from pathlib import Path
 import pickle
+
+from typing import cast
 
 import gtsam
 from gtsam import (
@@ -81,8 +83,13 @@ def load_data(
 
     # Gather all imu data
     imu_data: list[ImuMeasurement] = []
-    lidar_stamps = []
-    for mm in tqdm(dataset, leave=False, desc=f"{dataset.name()}/{dataset.seq}"):
+    lidar_stamps: list[Stamp] = []
+    for mm in tqdm(
+        dataset,
+        leave=False,
+        desc=f"{dataset.dataset_name()}/{dataset.seq_name}",
+        total=np.inf,
+    ):
         if isinstance(mm, ImuMeasurement):
             imu_data.append(mm)
         elif isinstance(mm, LidarMeasurement):
@@ -92,8 +99,8 @@ def load_data(
         if length is not None and len(lidar_stamps) >= length + 500:
             break
 
-    lidar_rate = len(lidar_stamps) / (lidar_stamps[-1] - lidar_stamps[0])
-    imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp)
+    lidar_rate = len(lidar_stamps) / (lidar_stamps[-1] - lidar_stamps[0]).to_sec()
+    imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp).to_sec()
     print("----Lidar rate:", lidar_rate, len(lidar_stamps))
     print("----Imu rate:", imu_rate)
 
@@ -170,7 +177,7 @@ def estimate_biases(
             continue
 
         if imu_data[imu_idx].stamp < gt.stamps[gt_idx]:
-            dt = imu_data[imu_idx].stamp - imu_data[imu_idx - 1].stamp
+            dt = (imu_data[imu_idx].stamp - imu_data[imu_idx - 1].stamp).to_sec()
             pim.integrateMeasurement(
                 imu_data[imu_idx].accel, imu_data[imu_idx].gyro, dt
             )
@@ -326,7 +333,7 @@ def run(name: str, out_dir: Path, force: bool = False, length: Optional[int] = N
     # Check if it's already been run
     dir = out_dir / "imu_integration"
     dir.mkdir(parents=True, exist_ok=True)
-    filename = dir / f"{dataset.name()}_{dataset.seq}.pkl"
+    filename = dir / f"{dataset.dataset_name()}_{dataset.seq_name}.pkl"
     if not force and filename.exists():
         print("----Skipping")
         print()
@@ -336,7 +343,10 @@ def run(name: str, out_dir: Path, force: bool = False, length: Optional[int] = N
     imu_data, lidar_stamps, gt = load_data(dataset, length)
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
     integrated_results = integrate_along_lidarscans(
-        lidar_stamps, imu_data, opt_result, dataset.imu_params().gravity
+        lidar_stamps,
+        imu_data,
+        opt_result,
+        cast(np.ndarray, dataset.imu_params().gravity),
     )
 
     with open(filename, "wb") as f:
@@ -350,7 +360,7 @@ def test(name: str, length: Optional[int] = None):
     imu_data, lidar_stamps, gt = load_data(dataset, length)
     opt_result = estimate_biases(imu_data, dataset.imu_params(), gt)
     results = integrate_entire_trajectory(
-        imu_data, opt_result, dataset.imu_params().gravity
+        imu_data, opt_result, cast(np.ndarray, dataset.imu_params().gravity)
     )
 
     import matplotlib.pyplot as plt
@@ -365,19 +375,21 @@ def test(name: str, length: Optional[int] = None):
     plt.savefig("figures/biases.png")
 
     # Ballpark how many imu measurements to plot
-    opt_rate = len(opt_result.stamps) / (opt_result.stamps[-1] - opt_result.stamps[0])
-    imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp)
+    opt_rate = (
+        len(opt_result.stamps) / (opt_result.stamps[-1] - opt_result.stamps[0]).to_sec()
+    )
+    imu_rate = len(imu_data) / (imu_data[-1].stamp - imu_data[0].stamp).to_sec()
     diff = int(imu_rate / opt_rate)
 
     # plot the poses to make imu integration roughly matches trajectory
     fig, ax = plt.subplots(1, 1, layout="constrained")
     num = 400
-    x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]
-    y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]
+    x = np.asarray([p.trans[0] for p in opt_result.poses])[:num]  # type: ignore
+    y = np.asarray([p.trans[1] for p in opt_result.poses])[:num]  # type: ignore
     ax.scatter(x, y, s=1, alpha=0.5, label="Ground Truth")
 
-    x = np.asarray([p.pose.trans[0] for p in results])[: num * diff]
-    y = np.asarray([p.pose.trans[1] for p in results])[: num * diff]
+    x = np.asarray([p.pose.trans[0] for p in results])[: num * diff]  # type: ignore
+    y = np.asarray([p.pose.trans[1] for p in results])[: num * diff]  # type: ignore
 
     print("imu end:", results[num * diff].stamp)
     print("opt end:", opt_result.stamps[num])

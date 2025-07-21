@@ -40,7 +40,7 @@ def convert(val):
         return LoamSO3(w=val.qw, x=val.qx, y=val.qy, z=val.qz)
     elif isinstance(val, EvalioSE3):
         r = convert(val.rot)
-        return LoamSE3(r, val.trans)
+        return LoamSE3(r, val.trans)  # type: ignore
 
     # From Loam to Evalio
     elif isinstance(val, LoamLidarParams):

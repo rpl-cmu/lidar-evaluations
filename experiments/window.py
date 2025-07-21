@@ -20,7 +20,7 @@ from env import (
     setup_plot,
 )
 
-dir = RESULTS_DIR / "25.02.25_window_final"
+dir = RESULTS_DIR / "25.07.08_window_final"
 
 
 def run(num_threads: int):
@@ -46,7 +46,7 @@ def split_dataset_to_seq(df: pl.DataFrame) -> pl.DataFrame:
         "newer_college_2021": "Newer College Multi-Cam",
         "hilti_2022": "Hilti 2022",
         "oxford_spires": "Oxford Spires",
-        "multi_campus_2024": "Multi-Campus",
+        "multi_campus": "Multi-Campus",
         "helipr": "HeLiPR",
         "botanic_garden": "Botanic Garden",
     }
